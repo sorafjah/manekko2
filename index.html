@@ -269,9 +269,9 @@ const DEF = {
   chasePath:'mix', chaseSpeed:'normal',
   slashKind:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3,
   handsBy:{touch:'both', slash:'R', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
-  bothType:'free', defVer:3,
+  bothType:'free', defVer:4,
   orderKind:'num', orderNumStart:1, orderNumStep:1, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
-  orderCount:5, orderDir:'up', orderHint:true, orderNext:'next',
+  orderCount:5, orderDir:'up', orderHint:false, orderNext:'next',
   stopMove:'normal', stopLen:3, stopStrict:'normal', stopSpeed:'normal',
   sortSet:'color', sortN:2, sortBox:'bottom',
   traceShape:'mix', traceWidth:'normal', traceOrder:'seq', traceStartBy:{num:1, ABC:0, abc:0, hira:0, kata:0}
@@ -283,7 +283,9 @@ try{
     // 手の色の初期値を変えたので、前の版で保存した色は新しい初期値にもどす
     if(!(s.colVer >= 2)){ ['colOne','colR','colL','colP1','colP2'].forEach(k=>delete s[k]); s.colVer = 2; }
     // 初期値を変えた設定を、新しい初期値にする
-    if(!(s.defVer >= 3)){ s.bothType = 'free'; s.defVer = 3; }
+    if(!(s.defVer >= 3)){ s.bothType = 'free'; }
+    if(!(s.defVer >= 4)){ s.orderHint = false; }
+    s.defVer = 4;
     if(s.sortSet==='fv') s.sortSet = 'color';
     S = Object.assign({}, DEF, s);
     S.handsBy = Object.assign({}, DEF.handsBy, s.handsBy || {});
@@ -1812,6 +1814,12 @@ function updateOrder(dt, now){
     }
   }
 }
+// 白い文字が よめるように、色を すこし こくする
+function darkHex(c, k){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(c)); if(!m) return c;
+  const n = parseInt(m[1],16), f = v=>Math.round(v*k).toString(16).padStart(2,'0');
+  return '#'+f(n>>16&255)+f(n>>8&255)+f(n&255);
+}
 function drawOrder(now){
   for(const pl of players){
     const o = pl.ord; if(!o) continue;
@@ -1826,7 +1834,7 @@ function drawOrder(now){
           ctx.save(); ctx.strokeStyle='#FFFFFF'; ctx.globalAlpha=0.9; ctx.lineWidth=Math.max(5, t.r*0.12);
           ctx.beginPath(); ctx.arc(t.x, t.y, t.r*(1.3 + 0.12*Math.sin(now/180)), 0, Math.PI*2); ctx.stroke(); ctx.restore();
         }
-        drawBall(t.x, t.y, t.r*s, color, t.label, {shape:'circle', lit:isNext});
+        drawBall(t.x, t.y, t.r*s, color, t.label, {shape:'circle', lit:isNext, fill:darkHex(color, 0.7)});
       }
     }
     if(S.orderHint && o.next < o.toks.length){
