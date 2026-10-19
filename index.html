@@ -6,6 +6,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>ポーズでゲーム</title>
+<meta name="description" content="iPadのカメラで手の動きを読み取り、大きな画面で体を動かして遊ぶアプリ。タッチ・きる・おいかけ・りょうて・じゅんばん・ストップ・なかまわけ・なぞり（形・数字・アルファベット・ひらがな・カタカナ）の8つのあそび。">
+<meta property="og:title" content="ポーズでゲーム">
+<meta property="og:description" content="iPadのカメラで手の動きを読み取り、大きな画面で体を動かして遊ぶアプリ。タッチ・きる・おいかけ・りょうて・じゅんばん・ストップ・なかまわけ・なぞり（形・数字・アルファベット・ひらがな・カタカナ）の8つのあそび。">
+<meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
@@ -306,7 +310,7 @@ const MODES = [
   {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに', ok:true},
   {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる', ok:true},
   {id:'sort', name:'なかまわけ', desc:'はこに はこんで わける', ok:true},
-  {id:'trace', name:'なぞり', desc:R_('大','おお')+'きな '+R_('形','かたち')+'を なぞる', ok:true}
+  {id:'trace', name:'なぞり', desc:R_('形','かたち')+'や '+R_('文字','もじ')+'を なぞる', ok:true}
 ];
 
 const COLORS = [['#F07A18','オレンジ'],['#E03A3A','あか'],['#E5487A','ピンク'],['#D99A00','きいろ'],['#1FA85A','みどり'],['#1AA6C9','みずいろ'],['#2C6BDF','あお'],['#7C4DDB','むらさき']];
@@ -1834,7 +1838,7 @@ function drawOrder(now){
 
 /* ================= ストップモード ================= */
 const STOP_TOL = { easy:0.09, normal:0.06, hard:0.04 };
-const STOP_MOVE = { short:[3,5], normal:[5,8], long:[8,12] };
+const STOP_MOVE = { short:[1,2.5], normal:[1.5,4.5], long:[3,7] };
 let stopSt = null;
 function moveDur(){ const a = STOP_MOVE[S.stopMove]; return a[0] + Math.random()*(a[1]-a[0]); }
 function stopSetup(){ stopSt = {phase:'move', t:0, dur:moveDur(), flash:0}; if(!chasers.length) chaseSetup(); }
@@ -1965,7 +1969,7 @@ function sortBoxes(pl){
     return [{x:z.xa+m, y, w, h}, {x:z.xb-m-w, y, w, h}];
   }
   const w = zw*(two() ? 0.3 : 0.22), h = hh*0.27;
-  const midY = HUDH + hh*0.3, lowY = H - m - h;
+  const midY = HUDH + hh*0.05, lowY = H - m - h;
   const L = {x:z.xa+m, y:midY, w, h}, R = {x:z.xb-m-w, y:midY, w, h};
   if(S.sortN===3) return [L, R, {x:(z.xa+z.xb)/2 - w/2, y:lowY, w, h}];
   return [L, R, {x:z.xa+m, y:lowY, w, h}, {x:z.xb-m-w, y:lowY, w, h}];
