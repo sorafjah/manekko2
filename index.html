@@ -303,13 +303,13 @@ function saveS(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catc
 const R_ = (k,r)=>'<ruby>'+k+'<rt>'+r+'</rt></ruby>';
 
 const MODES = [
-  {id:'touch', name:'タッチ', desc:'あちこちに '+R_('出','で')+'る '+R_('的','まと')+'に タッチ', ok:true},
+  {id:'touch', name:'タッチ', desc:'あちこちに '+R_('出','で')+'る ターゲットに タッチ', ok:true},
   {id:'slash', name:'きる', desc:'とんでくる ものを きる', ok:true},
   {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける', ok:true},
   {id:'both', name:'りょうて', desc:'ふたつ '+R_('同時','どうじ')+'に タッチ', ok:true},
   {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに', ok:true},
   {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる', ok:true},
-  {id:'sort', name:'なかまわけ', desc:'はこに はこんで わける', ok:true},
+  {id:'sort', name:'なかまわけ', desc:R_('同','おな')+'じ ところに はこぶ', ok:true},
   {id:'trace', name:'なぞり', desc:R_('形','かたち')+'や '+R_('文字','もじ')+'を なぞる', ok:true}
 ];
 
@@ -1683,7 +1683,7 @@ function spawnPair(pl){
   if(designated()){
     const rd = bodyRightDir(pl); hB = rd>0 ? 'R' : 'L'; hA = hB==='R' ? 'L' : 'R';
     // ときどき 右手が 左、左手が 右（からだの まんなかを こえる）。たてのときは どちらでも
-    if(tate || Math.random() < 0.35){ const t=hA; hA=hB; hB=t; }
+    if(tate || Math.random() < 0.2){ const t=hA; hA=hB; hB=t; }
   }
   const mk = (p,h)=>({x:p.x, y:p.y, r, hand:h, color:handColor(pl, h||'R'), lastT:-1e9, by:null});
   pairs.push({pl, a:mk(A,hA), b:mk(B,hB), age:0, state:'in', outT:0, hintCd:0, wrongCd:0});
