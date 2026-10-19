@@ -111,10 +111,12 @@ ruby rt{font-size:.5em;font-weight:400}
 #msgMain{font-size:clamp(28px,4.6vw,50px);font-weight:700;line-height:1.5;color:var(--ink)}
 #msgSub{font-size:clamp(18px,2.6vw,26px);color:var(--sub);line-height:1.9;margin-top:4px}
 #msgBar{margin:12px auto 2px;width:min(420px,70vw);height:18px;border-radius:9px;background:var(--off);overflow:hidden}
-#msgBar i{display:block;height:100%;width:0;background:var(--main)}
+#msgBar i{display:block;height:100%;width:0;background:var(--c,var(--main))}
 #msg.big .box{background:var(--c,var(--main));border:6px solid #fff;border-radius:999px;padding:6px 56px;box-shadow:0 6px 0 rgba(0,0,0,.18),0 10px 24px rgba(0,0,0,.2)}
 #msg.big #msgMain{color:#fff;font-size:clamp(56px,8.5vw,100px);line-height:1.2;letter-spacing:.04em}
 #msg.big.word #msgMain{font-size:clamp(40px,6vw,72px)}
+#msg .box{border-color:var(--c,var(--main))}
+#msg.tint #msgMain{color:var(--c)}
 #msg.pop .box{animation:pop .38s cubic-bezier(.2,1.6,.4,1)}
 @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){#msg.pop .box{animation:none}}
@@ -129,6 +131,8 @@ ruby rt{font-size:.5em;font-weight:400}
 .res .lbl{font-size:22px;font-weight:700;line-height:2}
 .res .lr{display:flex;justify-content:center;gap:14px;margin:14px 0 20px;flex-wrap:wrap}
 .res .lr div{min-width:150px;padding:8px 14px;border-radius:14px;font-size:22px;font-weight:700;line-height:1.9;border:3px solid}
+.res .extra{font-size:22px;font-weight:700;margin:2px 0 8px;line-height:1.9}
+.res .lr .ex{display:block;font-size:17px;color:#5A6878;font-style:normal}
 .res .lr.wide div{min-width:200px;font-size:24px}
 .res .lr.wide em{font-size:64px;line-height:1.3}
 .res .lr em{font-style:normal;font-size:34px;font-variant-numeric:tabular-nums}
@@ -191,6 +195,7 @@ ruby rt{font-size:.5em;font-weight:400}
     <p class="praise">よく がんばったね</p>
     <div class="lbl" id="resLbl">タッチした<ruby>数<rt>かず</rt></ruby></div>
     <div class="num" id="resNum">0</div>
+    <div class="extra" id="resExtra" hidden></div>
     <div class="lr" id="resBoxes"></div>
     <div class="btns">
       <button class="btn main" id="btnAgain">もういちど</button>
@@ -257,7 +262,14 @@ const DEF = {
   size:'m', shape:'circle', count:1, life:'normal', sound:true,
   colOne:'#1AA6C9', colR:'#E5487A', colL:'#1AA6C9', colP1:'#E5487A', colP2:'#1AA6C9', colVer:2,
   chasePath:'mix', chaseSpeed:'normal',
-  slashKind:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3
+  slashKind:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3,
+  handsBy:{touch:'both', slash:'R', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
+  bothType:'sym',
+  orderKind:'num', orderNumStart:1, orderNumStep:1, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
+  orderCount:5, orderDir:'up', orderHint:true,
+  stopMove:'normal', stopLen:3, stopStrict:'normal',
+  sortSet:'fv', sortBox:'bottom',
+  traceShape:'mix', traceWidth:'normal'
 };
 let S = Object.assign({}, DEF);
 try{
@@ -266,27 +278,34 @@ try{
     // 手の色の初期値を変えたので、前の版で保存した色は新しい初期値にもどす
     if(!(s.colVer >= 2)){ ['colOne','colR','colL','colP1','colP2'].forEach(k=>delete s[k]); s.colVer = 2; }
     S = Object.assign({}, DEF, s);
+    S.handsBy = Object.assign({}, DEF.handsBy, s.handsBy || {});
   }
 }catch(e){}
+if(!S.handsBy) S.handsBy = Object.assign({}, DEF.handsBy);
+if(!MODE_IDS().includes(S.mode)) S.mode = 'touch';
+S.hands = S.handsBy[S.mode] || 'both';
+if(S.mode==='both') S.hands = 'both';
+function MODE_IDS(){ return ['touch','slash','chase','both','order','stop','sort','trace']; }
 function saveS(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
 
 const R_ = (k,r)=>'<ruby>'+k+'<rt>'+r+'</rt></ruby>';
 
 const MODES = [
   {id:'touch', name:'タッチ', desc:'あちこちに '+R_('出','で')+'る '+R_('的','まと')+'に タッチ', ok:true},
-  {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける', ok:true},
   {id:'slash', name:'きる', desc:'とんでくる ものを きる', ok:true},
-  {id:'both', name:'りょうて', desc:'ふたつ '+R_('同時','どうじ')+'に タッチ'},
-  {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに'},
-  {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる'},
-  {id:'sort', name:'なかまわけ', desc:'はこに はこんで わける'},
-  {id:'trace', name:'なぞり', desc:R_('大','おお')+'きな '+R_('形','かたち')+'を なぞる'}
+  {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける', ok:true},
+  {id:'both', name:'りょうて', desc:'ふたつ '+R_('同時','どうじ')+'に タッチ', ok:true},
+  {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに', ok:true},
+  {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる', ok:true},
+  {id:'sort', name:'なかまわけ', desc:'はこに はこんで わける', ok:true},
+  {id:'trace', name:'なぞり', desc:R_('大','おお')+'きな '+R_('形','かたち')+'を なぞる', ok:true}
 ];
 
 const COLORS = [['#F07A18','オレンジ'],['#E03A3A','あか'],['#E5487A','ピンク'],['#D99A00','きいろ'],['#1FA85A','みどり'],['#1AA6C9','みずいろ'],['#2C6BDF','あお'],['#7C4DDB','むらさき']];
 // 1人のときに、右手と左手を分けて使うか
-const designated = ()=> S.players===1 && (S.hands!=='both' || S.lr);
-const MODE_NAME = {touch:'タッチ', chase:'おいかけ', slash:'きる'};
+const LR_MODES = ['touch','slash','chase','both'];
+const designated = ()=> S.players===1 && (S.hands!=='both' || (S.lr && LR_MODES.includes(S.mode)));
+const MODE_NAME = {touch:'タッチ', chase:'おいかけ', slash:'きる', both:'りょうて', order:'じゅんばん', stop:'ストップ', sort:'なかまわけ', trace:'なぞり'};
 
 const SCHEMA = [
   {grp:'あそびかた'},
@@ -294,16 +313,16 @@ const SCHEMA = [
   {key:'team', label:'ふたりのとき', type:'seg', opts:[['vs','きょうそう'],['coop','きょうりょく']], show:()=>S.players===2,
     hint:'きょうりょく：ふたりの '+R_('数','かず')+'を あわせるよ。ふたりのときは、'+R_('画面','がめん')+'の '+R_('左','ひだり')+'と '+R_('右','みぎ')+'に わかれて、それぞれの がわに '+R_('的','まと')+'が '+R_('出','で')+'るよ。'},
   {key:'time', label:R_('時間','じかん'), type:'step', min:10, max:300, step:10, unit:'秒'},
-  {key:'hands', label:R_('使','つか')+'う'+R_('手','て'), type:'seg', opts:[['both',R_('両手','りょうて')],['R',R_('右手','みぎて')+'だけ'],['L',R_('左手','ひだりて')+'だけ']]},
-  {key:'lr', label:R_('左右','さゆう')+'の'+R_('指定','してい'), type:'seg', opts:[[false,'なし'],[true,'あり']], show:()=>S.hands==='both' && S.players===1,
+  {key:'hands', label:R_('使','つか')+'う'+R_('手','て'), type:'seg', show:()=>S.mode!=='both', opts:[['both',R_('両手','りょうて')],['R',R_('右手','みぎて')+'だけ'],['L',R_('左手','ひだりて')+'だけ']]},
+  {key:'lr', label:R_('左右','さゆう')+'の'+R_('指定','してい'), type:'seg', opts:[[false,'なし'],[true,'あり']], show:()=>S.hands==='both' && S.players===1 && LR_MODES.includes(S.mode),
     hint:'「あり」にすると、'+R_('右手','みぎて')+'と '+R_('左手','ひだりて')+'が べつの '+R_('色','いろ')+'に なって、'+R_('的','まと')+'にも '+R_('同','おな')+'じ '+R_('色','いろ')+'と「みぎ」「ひだり」が つくよ。'},
   {key:'colOne', label:R_('手','て')+'の'+R_('色','いろ'), type:'color', show:()=>S.players===1 && !designated()},
   {key:'colR', label:R_('右手','みぎて')+'の'+R_('色','いろ'), type:'color', show:()=>designated()},
   {key:'colL', label:R_('左手','ひだりて')+'の'+R_('色','いろ'), type:'color', show:()=>designated()},
   {key:'colP1', label:R_('左','ひだり')+'がわの'+R_('人','ひと'), type:'color', show:()=>S.players===2},
   {key:'colP2', label:R_('右','みぎ')+'がわの'+R_('人','ひと'), type:'color', show:()=>S.players===2},
-  {key:'size', label:R_('的','まと')+'の'+R_('大','おお')+'きさ', type:'seg', opts:[['s',R_('小','しょう')],['m',R_('中','ちゅう')],['l',R_('大','だい')]]},
-  {key:'shape', label:R_('的','まと')+'の'+R_('形','かたち'), type:'seg', opts:[['circle','まる'],['star','ほし'],['heart','ハート']], show:()=>S.mode!=='slash'},
+  {key:'size', label:R_('的','まと')+'の'+R_('大','おお')+'きさ', type:'seg', opts:[['s',R_('小','しょう')],['m',R_('中','ちゅう')],['l',R_('大','だい')]], show:()=>S.mode!=='trace'},
+  {key:'shape', label:R_('的','まと')+'の'+R_('形','かたち'), type:'seg', opts:[['circle','まる'],['star','ほし'],['heart','ハート']], show:()=>['touch','chase','both','stop'].includes(S.mode)},
 
   {grp:'タッチの せってい', mode:['touch']},
   {key:'side', label:R_('的','まと')+'の'+R_('場所','ばしょ'), type:'seg', opts:[['any','どこでも'],['same',R_('同','おな')+'じがわ'],['opp',R_('反対','はんたい')+'がわ']],
@@ -325,6 +344,41 @@ const SCHEMA = [
   {key:'slashEase', label:'きれやすさ', type:'seg', opts:[['easy','やさしい'],['normal','ふつう'],['hard','むずかしい']],
     hint:R_('手','て')+'を すばやく '+R_('動','うご')+'かすと きれるよ。ゆっくり さわっても きれないよ。やさしい：すこし はやければ きれるよ。'},
   {key:'slashCount', label:R_('画面','がめん')+'に'+R_('出','で')+'る'+R_('数','かず'), type:'step', min:1, max:6, step:1, unit:'こ'},
+
+  {grp:'りょうての せってい', mode:['both']},
+  {key:'bothType', label:R_('出','で')+'かた', type:'seg', opts:[['sym','そろえて'],['free','ばらばら']],
+    hint:'そろえて：'+R_('左','ひだり')+'と '+R_('右','みぎ')+'に '+R_('同','おな')+'じ たかさで '+R_('出','で')+'るよ。'+R_('両手','りょうて')+'で '+R_('同時','どうじ')+'に さわると「そろった」に なるよ。'},
+
+  {grp:'じゅんばんの せってい', mode:['order']},
+  {key:'orderKind', label:'しゅるい', type:'seg', opts:[['num',R_('数字','すうじ')],['hira','ひらがな'],['ABC','ABC（'+R_('大文字','おおもじ')+'）'],['abc','abc（'+R_('小文字','こもじ')+'）']]},
+  {key:'orderNumStart', label:'はじめ', type:'step', min:0, max:100, step:1, unit:'から', show:()=>S.orderKind==='num'},
+  {key:'orderNumStep', label:'とびかた', type:'seg', opts:[[1,'1ずつ'],[2,'2とび'],[5,'5とび'],[10,'10とび']], show:()=>S.orderKind==='num'},
+  {key:'orderHiraStart', label:'はじめ', type:'pick', list:()=>HIRA, unit:'から', show:()=>S.orderKind==='hira'},
+  {key:'orderHiraStep', label:'とびかた', type:'seg', opts:[['one','1もじずつ'],['row',R_('行','ぎょう')+'の はじめ（あ・か・さ…）']], show:()=>S.orderKind==='hira'},
+  {key:'orderAbcStart', label:'はじめ', type:'pick', list:()=>S.orderKind==='ABC' ? ABC : abc, unit:'から', show:()=>S.orderKind==='ABC' || S.orderKind==='abc'},
+  {key:'orderAbcStep', label:'とびかた', type:'seg', opts:[[1,'1もじずつ'],[2,'1つとび']], show:()=>S.orderKind==='ABC' || S.orderKind==='abc'},
+  {key:'orderCount', label:'いくつ', type:'step', min:2, max:10, step:1, unit:'こ'},
+  {key:'orderDir', label:'むき', type:'seg', opts:[['up','まえから（1→2→3）'],['down','うしろから（3→2→1）']]},
+  {key:'orderHint', label:'つぎを おしえる', type:'seg', opts:[[true,'あり'],[false,'なし']],
+    hint:'あり：つぎに タッチする ものが ひかって、'+R_('上','うえ')+'に「つぎは ○」と '+R_('出','で')+'るよ。'},
+  {type:'info', label:'れい', html:()=>{ const q = orderSeq(); return q.length ? q.join(' → ') : '（この せっていでは ならべられないよ）'; }},
+
+  {grp:'ストップの せってい', mode:['stop']},
+  {key:'stopMove', label:R_('動','うご')+'く'+R_('時間','じかん'), type:'seg', opts:[['short','みじかい'],['normal','ふつう'],['long','ながい']],
+    hint:'「うごいて」の あいだは '+R_('的','まと')+'に タッチして、「ストップ」の '+R_('合図','あいず')+'で '+R_('手','て')+'を とめるよ。'},
+  {key:'stopLen', label:'ストップの'+R_('長','なが')+'さ', type:'seg', opts:[[2,'2秒'],[3,'3秒'],[5,'5秒']]},
+  {key:'stopStrict', label:'きびしさ', type:'seg', opts:[['easy','やさしい'],['normal','ふつう'],['hard','きびしい']],
+    hint:'やさしい：すこし うごいても だいじょうぶだよ。'},
+
+  {grp:'なかまわけの せってい', mode:['sort']},
+  {key:'sortSet', label:'わけかた', type:'seg', opts:[['fv','くだもの と やさい'],['color','あか と あお'],['shape','まる と さんかく']],
+    hint:R_('出','で')+'てきた ものに '+R_('手','て')+'で さわると くっつくよ。そのまま はこまで はこんでね。'},
+  {key:'sortBox', label:'はこの'+R_('場所','ばしょ'), type:'seg', opts:[['bottom','した'],['side','よこ']]},
+
+  {grp:'なぞりの せってい', mode:['trace']},
+  {key:'traceShape', label:'かたち', type:'seg', opts:[['mix','いろいろ'],['circle','まる'],['tri','さんかく'],['square','しかく'],['heart','ハート'],['star','ほし'],['wave','なみ'],['zig','ギザギザ'],['num',R_('数字','すうじ')]]},
+  {key:'traceWidth', label:R_('線','せん')+'の ふとさ', type:'seg', opts:[['wide','ふとい'],['normal','ふつう'],['thin','ほそい']],
+    hint:'ふといほど はみだしにくいよ。'},
 
   {grp:'カメラ'},
   {key:'camera', label:'カメラ', type:'seg', opts:[['user','インカメラ'],['environment',R_('背面','はいめん')+'カメラ']]},
@@ -374,7 +428,7 @@ function renderModes(){
     b.className = 'mode' + (S.mode===m.id ? ' sel':'');
     b.innerHTML = '<b>'+m.name+'</b><span>'+m.desc+'</span>' + (m.ok ? '' : '<span class="tag">じゅんびちゅう</span>');
     b.disabled = !m.ok;
-    b.addEventListener('click', ()=>{ S.mode=m.id; saveS(); renderModes(); renderSummary(); });
+    b.addEventListener('click', ()=>{ S.mode=m.id; S.hands = m.id==='both' ? 'both' : (S.handsBy[m.id]||'both'); saveS(); renderModes(); renderSummary(); });
     box.appendChild(b);
   });
 }
@@ -392,9 +446,12 @@ function renderSummary(){
   parts.push('<b>'+S.time+'秒</b>');
   if(S.mode==='chase'){ const o=SCHEMA.find(x=>x.key==='chasePath').opts.find(x=>x[0]===S.chasePath); if(o) parts.push(o[1]); }
   if(S.mode==='slash'){ const o=SCHEMA.find(x=>x.key==='slashKind').opts.find(x=>x[0]===S.slashKind); if(o) parts.push(o[1]); }
+  if(S.mode==='order'){ const q=orderSeq(); if(q.length) parts.push(q.slice(0,4).join('→')+(q.length>4?'…':'')); }
+  if(S.mode==='sort'){ const o=SCHEMA.find(x=>x.key==='sortSet').opts.find(x=>x[0]===S.sortSet); if(o) parts.push(o[1]); }
+  if(S.mode==='trace'){ const o=SCHEMA.find(x=>x.key==='traceShape').opts.find(x=>x[0]===S.traceShape); if(o) parts.push(o[1]); }
   if(S.players===2) parts.push('ふたりで'+(S.team==='coop'?'きょうりょく':'きょうそう'));
-  parts.push(S.hands==='both' ? R_('両手','りょうて') : S.hands==='R' ? R_('右手','みぎて')+'だけ' : R_('左手','ひだりて')+'だけ');
-  if(S.hands==='both' && S.players===1) parts.push(R_('左右','さゆう')+'の'+R_('指定','してい')+(S.lr?'あり':'なし'));
+  if(S.mode!=='both') parts.push(S.hands==='both' ? R_('両手','りょうて') : S.hands==='R' ? R_('右手','みぎて')+'だけ' : R_('左手','ひだりて')+'だけ');
+  if(S.hands==='both' && S.players===1 && LR_MODES.includes(S.mode)) parts.push(R_('左右','さゆう')+'の'+R_('指定','してい')+(S.lr?'あり':'なし'));
   if(S.mode==='touch' && designated()) parts.push(S.side==='any'?'どこでも':S.side==='same'?R_('同','おな')+'じがわ':R_('反対','はんたい')+'がわ');
   parts.push(S.camera==='user'?'インカメラ':R_('背面','はいめん')+'カメラ');
   $('summary').innerHTML = 'いまの せってい： ' + parts.join(' ・ ');
@@ -420,10 +477,24 @@ function renderSettings(){
       opts.forEach(([v,t])=>{
         const b=document.createElement('button'); b.innerHTML=t;
         if(S[it.key]===v) b.className='on';
-        b.addEventListener('click', ()=>{ S[it.key]=v; saveS(); renderSettings(); renderSummary(); renderPpl(); });
+        b.addEventListener('click', ()=>{ S[it.key]=v; if(it.key==='hands') S.handsBy[S.mode]=v; saveS(); renderSettings(); renderSummary(); renderPpl(); });
         seg.appendChild(b);
       });
       row.appendChild(seg);
+    }else if(it.type==='info'){
+      const d=document.createElement('div'); d.className='seg'; d.id='info_ex'; d.style.fontSize='20px'; d.style.fontWeight='700'; d.innerHTML=it.html(); row.appendChild(d);
+    }else if(it.type==='pick'){
+      const list = it.list();
+      if(S[it.key] >= list.length) S[it.key] = 0;
+      const st=document.createElement('div'); st.className='step';
+      const dn=document.createElement('button'); dn.textContent='▽'; dn.setAttribute('aria-label','まえへ');
+      const out=document.createElement('input'); out.readOnly=true; out.value=list[S[it.key]]; out.id='in_'+it.key;
+      const up=document.createElement('button'); up.textContent='△'; up.setAttribute('aria-label','つぎへ');
+      const un=document.createElement('span'); un.className='unit'; un.textContent=it.unit||'';
+      const setI = i=>{ S[it.key]=Math.max(0, Math.min(list.length-1, i)); saveS(); renderSettings(); renderSummary(); };
+      dn.addEventListener('click', ()=>setI(S[it.key]-1));
+      up.addEventListener('click', ()=>setI(S[it.key]+1));
+      st.append(dn,out,up,un); row.appendChild(st);
     }else{
       const st=document.createElement('div'); st.className='step';
       const dn=document.createElement('button'); dn.textContent='▽'; dn.setAttribute('aria-label','へらす');
@@ -431,7 +502,8 @@ function renderSettings(){
       const up=document.createElement('button'); up.textContent='△'; up.setAttribute('aria-label','ふやす');
       const un=document.createElement('span'); un.className='unit'; un.textContent=it.unit||'';
       const setV = v=>{ v=Math.round(Number(v)/it.step)*it.step; if(!isFinite(v)) v=S[it.key];
-        v=Math.max(it.min,Math.min(it.max,v)); S[it.key]=v; inp.value=v; saveS(); renderSummary(); };
+        v=Math.max(it.min,Math.min(it.max,v)); S[it.key]=v; inp.value=v; saveS(); renderSummary();
+        const ex=document.getElementById('info_ex'); if(ex) ex.innerHTML = orderSeq().join(' → '); };
       dn.addEventListener('click', ()=>setV(S[it.key]-it.step));
       up.addEventListener('click', ()=>setV(S[it.key]+it.step));
       inp.addEventListener('change', ()=>setV(inp.value));
@@ -678,7 +750,7 @@ function setMsg(main, sub, opt){
   clearTimeout(msgTimer);
   if(main===null){ msgEl.hidden=true; return; }
   msgEl.hidden=false;
-  msgEl.className = (opt.big ? 'big' : '') + (opt.word ? ' word' : '');
+  msgEl.className = (opt.big ? 'big' : '') + (opt.word ? ' word' : '') + (opt.tint ? ' tint' : '');
   msgEl.style.setProperty('--c', opt.color || '#12906A');
   msgMain.innerHTML = main; msgSub.innerHTML = sub||''; msgSub.hidden = !sub;
   msgBar.hidden = !opt.bar;
@@ -726,8 +798,8 @@ async function startStage(){
 
 function newGame(){
   remain = S.time;
-  for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; }
-  targets = []; particles = []; floats = []; chasers = []; items = []; pieces = [];
+  for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; pl.rounds=0; pl.stopOK=0; pl.stopN=0; pl.stop=null; pl.ord=null; pl.sort=null; pl.tr=null; }
+  targets = []; particles = []; floats = []; chasers = []; items = []; pieces = []; pairs = []; stopSt = null;
   gameStarted = false;
   hudScore.hidden = true; hudTime.hidden = true; hudScore2.hidden = true; hudGrow2.hidden = true;
   updateHud();
@@ -758,6 +830,7 @@ function enterCountdown(){
 function enterPlay(){
   phase = 'play'; gameStarted = true;
   if(S.mode==='chase' && !chasers.length) chaseSetup();
+  if(S.mode==='stop'){ if(!stopSt) stopSetup(); else if(stopSt.phase==='stop'){ stopSt.phase='move'; stopSt.t=0; stopSt.dur=moveDur(); } }
   updateHud();
   hudScore.hidden=false; hudTime.hidden=false;
   hudScore2.hidden=!two(); hudGrow2.hidden=!two();
@@ -772,30 +845,45 @@ function endGame(){
   renderResult();
   show(scrResult);
 }
-function scoreWord(){ return S.mode==='chase' ? 'ポイント' : S.mode==='slash' ? 'きった' : 'タッチ'; }
-function scoreTitle(){ return S.mode==='chase' ? 'ポイント' : S.mode==='slash' ? 'きった'+R_('数','かず') : 'タッチした'+R_('数','かず'); }
+const WORDS = {
+  touch:['タッチ', 'タッチした'+R_('数','かず')], slash:['きった', 'きった'+R_('数','かず')], chase:['ポイント', 'ポイント'],
+  both:['そろった', 'そろった'+R_('数','かず')], order:['タッチ', 'じゅんばんに タッチした'+R_('数','かず')],
+  stop:['タッチ', 'タッチした'+R_('数','かず')], sort:['わけた', 'わけた'+R_('数','かず')], trace:['なぞった', 'なぞれた'+R_('数','かず')]
+};
+function scoreWord(){ return (WORDS[S.mode]||WORDS.touch)[0]; }
+function scoreTitle(){ return (WORDS[S.mode]||WORDS.touch)[1]; }
+function extraText(pl){
+  if(S.mode==='stop') return 'ストップ できた '+(pl.stopOK||0)+' / '+(pl.stopN||0)+R_('回','かい');
+  if(S.mode==='order') return 'ぜんぶ できた '+(pl.rounds||0)+R_('回','かい');
+  return '';
+}
 function renderResult(){
   const box = $('resBoxes'); box.innerHTML=''; box.className='lr';
-  const mk = (label, n, color)=>{
+  const mk = (label, n, color, ex)=>{
     const d=document.createElement('div');
     d.style.borderColor=color; d.style.color='#1E2833';
-    d.innerHTML = label+'<br><em style="color:'+color+'">'+n+'</em>';
+    d.innerHTML = label+'<br><em style="color:'+color+'">'+n+'</em>' + (ex ? '<span class="ex">'+ex+'</span>' : '');
     box.appendChild(d);
   };
-  const num=$('resNum'), lbl=$('resLbl');
+  const num=$('resNum'), lbl=$('resLbl'), ext=$('resExtra');
+  ext.hidden = true;
   if(!two()){
     const pl = players[0];
     lbl.innerHTML = scoreTitle(); num.hidden=false; num.textContent = pl.score;
-    mk(R_('右手','みぎて'), pl.byHand.R, handColor(pl,'R'));
-    mk(R_('左手','ひだりて'), pl.byHand.L, handColor(pl,'L'));
+    const ex = extraText(pl); if(ex){ ext.innerHTML = ex; ext.hidden = false; }
+    // 両手を同時に使うモードと、片手だけのときは、左右の数を出さない
+    if(S.mode!=='both' && S.mode!=='trace' && S.hands==='both'){
+      mk(R_('右手','みぎて'), pl.byHand.R, handColor(pl,'R'));
+      mk(R_('左手','ひだりて'), pl.byHand.L, handColor(pl,'L'));
+    }
   }else if(S.team==='coop'){
     lbl.innerHTML = 'ふたりで '+scoreTitle(); num.hidden=false;
     num.textContent = players[0].score + players[1].score;
-    players.forEach(pl=>mk(sideName(pl), pl.score, pl.color));
+    players.forEach(pl=>mk(sideName(pl), pl.score, pl.color, extraText(pl)));
   }else{
     lbl.innerHTML = scoreTitle(); num.hidden=true;
     box.className='lr wide';
-    players.forEach(pl=>mk(sideName(pl), pl.score, pl.color));
+    players.forEach(pl=>mk(sideName(pl), pl.score, pl.color, extraText(pl)));
   }
 }
 function goHome(){
@@ -949,7 +1037,7 @@ function loop(now){
         hd.trail.push({x:hd.x, y:hd.y, t:now});
         hd.speed = Math.hypot(hd.x-hd.px, hd.y-hd.py)/dt;
         hd.vs = hd.vs*0.45 + hd.speed*0.55;
-        if(hd.speed > MIN*1.2 && Math.random() < 0.5*k) spark(hd.x, hd.y, handColor(pl,h), 1, 0.6);
+        if(usesHand(h) && hd.speed > MIN*1.2 && Math.random() < 0.5*k) spark(hd.x, hd.y, handColor(pl,h), 1, 0.6);
       }else{
         hd.a = Math.max(0, hd.a - dt*4);
         hd.speed = 0; hd.vs = 0;
@@ -971,9 +1059,7 @@ function loop(now){
 
   if(phase==='play'){
     remain -= dt;
-    if(S.mode==='chase') updateChase(dt, now);
-    else if(S.mode==='slash') updateSlash(dt, now);
-    else updateTouch(dt, now);
+    ({touch:updateTouch, slash:updateSlash, chase:updateChase, both:updateBoth, order:updateOrder, stop:updateStop, sort:updateSort, trace:updateTrace}[S.mode] || updateTouch)(dt, now);
     if(remain <= 0){ remain = 0; updateHud(); endGame(); return; }
     updateHud();
   }
@@ -991,7 +1077,7 @@ function handR(){ return MIN*0.045; }
 function nextHand(pl){
   if(S.hands==='R') return 'R';
   if(S.hands==='L') return 'L';
-  if(two() || !S.lr) return null;
+  if(two() || !S.lr || !LR_MODES.includes(S.mode)) return null;
   let h = Math.random()<0.5 ? 'R' : 'L';
   const a = pl.lastAssign, n = a.length;
   if(n>=2 && a[n-1]===h && a[n-2]===h) h = (h==='R'?'L':'R');
@@ -1070,10 +1156,10 @@ function segDist(px,py, ax,ay, bx,by){
   return Math.hypot(px-(ax+vx*t), py-(ay+vy*t));
 }
 
-function updateTouch(dt, now){
+function updateTouch(dt, now, cnt){
   for(const pl of players){
     const live = targets.filter(t=>t.owner===pl && (t.state==='in'||t.state==='live')).length;
-    if(live < S.count){
+    if(live < (cnt || S.count)){
       pl.spawnT -= dt;
       if(pl.spawnT <= 0){ spawnTarget(pl); pl.spawnT = 0.35; }
     }
@@ -1360,8 +1446,8 @@ function updateSlash(dt, now){
     }
   }
   items = items.filter(it=> !it.dead && it.y < H + it.r*2.5 && it.y > -it.r*3);
-  for(const p of pieces){ p.vy += p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.spin*dt; p.t += dt; }
-  pieces = pieces.filter(p=> p.t < 2.5 && p.y < H + p.r*3);
+  for(const p of pieces){ p.vy += p.g*dt; p.vx *= Math.pow(0.4, dt); p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.spin*dt; p.t += dt; }
+  pieces = pieces.filter(p=> p.t < 2);
 }
 function cutItem(it, hd, h){
   it.dead = true;
@@ -1376,8 +1462,8 @@ function cutItem(it, hd, h){
   }else{
     for(const sgn of [1,-1]){
       pieces.push({ kind:it.kind, r:it.r, x:it.x + nx*sgn*it.r*0.08, y:it.y + ny*sgn*it.r*0.08,
-        vx: it.vx*0.5 + nx*sgn*sp, vy: Math.min(it.vy, 0)*0.3 + ny*sgn*sp - MIN*0.2, g: H*1.1,
-        rot: it.rot, spin: sgn*2.5, cut: ang - it.rot, side: sgn, t:0, color:it.color });
+        vx: it.vx*0.15 + nx*sgn*sp*0.45, vy: ny*sgn*sp*0.45 - MIN*0.06, g: H*0.18,
+        rot: it.rot, spin: sgn*1.1, cut: ang - it.rot, side: sgn, t:0, color:it.color });
     }
     const jc = ITEM_JUICE[it.kind] || '#FFFFFF';
     for(let i=0;i<16;i++){ const a=Math.random()*6.28, s=(2+Math.random()*5)*(MIN/700);
@@ -1458,7 +1544,8 @@ function drawItemShape(c, kind, r, color){
 function drawSlash(now){
   for(const it of items){
     ctx.save(); ctx.translate(it.x, it.y);
-    if(it.hand){
+    const showHand = it.hand && S.hands==='both';
+    if(showHand){
       ctx.beginPath(); ctx.arc(0, 0, it.r*1.25, 0, Math.PI*2);
       ctx.fillStyle = handColor(it.pl, it.hand); ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1;
     }
@@ -1466,7 +1553,7 @@ function drawSlash(now){
     ctx.rotate(it.rot);
     drawItemShape(ctx, it.kind, it.r, it.color);
     ctx.restore();
-    if(it.hand){
+    if(showHand){
       const fs = Math.round(Math.max(20, it.r*0.42));
       ctx.save(); ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.lineWidth=Math.max(5, fs*0.24); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
@@ -1475,8 +1562,9 @@ function drawSlash(now){
     }
   }
   for(const p of pieces){
-    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - Math.max(0, p.t-1.6)/0.9);
-    ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    const q = Math.min(1, p.t/2);
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - q*q*(3-2*q));
+    ctx.translate(p.x, p.y); ctx.scale(1+q*0.15, 1+q*0.15); ctx.rotate(p.rot);
     // 切り口で半分にする
     ctx.save(); ctx.rotate(p.cut);
     ctx.beginPath(); ctx.rect(-p.r*2, p.side>0 ? 0 : -p.r*2, p.r*4, p.r*2); ctx.clip();
@@ -1486,6 +1574,532 @@ function drawSlash(now){
     ctx.beginPath(); ctx.moveTo(-p.r*0.95, 0); ctx.lineTo(p.r*0.95, 0);
     ctx.lineWidth = Math.max(4, p.r*0.12); ctx.strokeStyle = ITEM_JUICE[p.kind] || '#FFF'; ctx.stroke();
     ctx.restore();
+    ctx.restore();
+  }
+}
+
+/* ================= 共通の道具 ================= */
+function usesHand(h){ return S.hands==='both' || S.hands===h; }
+// その場所に手がふれているか（ふれている手を返す）
+function touchingHand(pl, x, y, rad){
+  if(!pl.active) return null;
+  for(const h of ['R','L']){
+    if(!usesHand(h)) continue;
+    const hd = pl.hands[h];
+    if(!hd.seen || hd.a < 0.5) continue;
+    if(segDist(x, y, hd.px, hd.py, hd.x, hd.y) < rad + handR()*0.5) return h;
+  }
+  return null;
+}
+function addFloat(x, y, text, color, size, max){
+  floats.push({x, y, text, color:color||'#1E2833', t:0, max:max||1.2, size:size||Math.max(26, MIN*0.042)});
+}
+function canvasLabel(text, x, y, size, fill, stroke){
+  ctx.save(); ctx.font='700 '+Math.round(size)+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(4, size*0.22); ctx.strokeStyle=stroke||'rgba(255,255,255,0.95)';
+  ctx.strokeText(text, x, y); ctx.fillStyle=fill; ctx.fillText(text, x, y); ctx.restore();
+}
+// まるい的（形は設定どおり）
+function drawBall(x, y, r, color, label, opt){
+  opt = opt||{};
+  const lw = Math.max(4, r*0.11), shape = opt.shape || S.shape;
+  ctx.save(); ctx.globalAlpha = opt.alpha==null ? 1 : opt.alpha;
+  if(opt.lit){ const g = glowSprite(color), gs = r*2.5; ctx.drawImage(g, x-gs, y-gs, gs*2, gs*2); }
+  shapePath(ctx, shape, x, y, r + lw*0.9); ctx.fillStyle = opt.lit ? '#FFF7C2' : 'rgba(255,255,255,0.95)'; ctx.fill();
+  shapePath(ctx, shape, x, y, r); ctx.fillStyle = opt.fill || color; ctx.fill();
+  if(label){
+    const n = String(label).length, fs = r*(n<=1 ? 1.0 : n===2 ? 0.78 : 0.6)*(shape==='star' ? 0.75 : 1);
+    ctx.font='700 '+Math.round(fs)+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const ty = y + (shape==='heart' ? r*0.06 : 0) + fs*0.04;
+    ctx.lineJoin='round'; ctx.lineWidth=Math.max(3, fs*0.14); ctx.strokeStyle='rgba(0,0,0,0.22)'; ctx.strokeText(label, x, ty);
+    ctx.fillStyle = opt.textColor || '#FFFFFF'; ctx.fillText(label, x, ty);
+  }
+  ctx.restore();
+}
+
+/* ================= りょうてモード ================= */
+let pairs = [];
+function spawnPair(pl){
+  const z = zoneOf(pl), r = MIN*SIZE_R[S.size], m = r + MIN*0.035;
+  const xa = z.xa + m, xb = z.xb - m, y0 = HUDH + r + 8, y1 = H - m;
+  let cx = two() ? (z.xa+z.xb)/2 : (pl.active ? pl.cx : W/2);
+  cx = Math.max(xa + (xb-xa)*0.3, Math.min(xb - (xb-xa)*0.3, cx));
+  const gap = Math.max(r*1.4, (pl.sw||MIN*0.2)*0.55);
+  const maxL = Math.max(1, cx - gap - xa), maxR = Math.max(1, xb - (cx + gap));
+  let A, B;
+  for(let k=0;k<30;k++){
+    if(S.bothType==='sym'){
+      const dx = gap + Math.min(maxL, maxR)*(0.35 + 0.65*Math.random());
+      const y = y0 + Math.random()*(y1-y0);
+      A = {x:cx-dx, y}; B = {x:cx+dx, y};
+    }else{
+      A = {x: cx - gap - Math.random()*maxL, y: y0 + Math.random()*(y1-y0)};
+      B = {x: cx + gap + Math.random()*maxR, y: y0 + Math.random()*(y1-y0)};
+    }
+    let ok = true;
+    for(const h of ['R','L']){ const hd=pl.hands[h]; if(hd.seen && (Math.hypot(hd.x-A.x,hd.y-A.y)<r*2.2 || Math.hypot(hd.x-B.x,hd.y-B.y)<r*2.2)) ok=false; }
+    if(ok) break;
+  }
+  let hA=null, hB=null;
+  if(designated()){ const rd = bodyRightDir(pl); hB = rd>0 ? 'R' : 'L'; hA = hB==='R' ? 'L' : 'R'; }
+  const mk = (p,h)=>({x:p.x, y:p.y, r, hand:h, color:handColor(pl, h||'R'), lastT:-1e9, by:null});
+  pairs.push({pl, a:mk(A,hA), b:mk(B,hB), age:0, state:'in', outT:0, hintCd:0, wrongCd:0});
+}
+function updateBoth(dt, now){
+  for(const pl of players){
+    if(!pairs.some(p=>p.pl===pl && p.state!=='out')){
+      pl.spawnT -= dt; if(pl.spawnT<=0){ spawnPair(pl); pl.spawnT = 0.45; }
+    }
+  }
+  for(const p of pairs){
+    if(p.state==='out'){ p.outT += dt; continue; }
+    p.age += dt; p.hintCd = Math.max(0, p.hintCd-dt); p.wrongCd = Math.max(0, p.wrongCd-dt);
+    if(p.age < 0.3) continue;
+    const pl = p.pl;
+    for(const t of [p.a, p.b]){
+      const h = touchingHand(pl, t.x, t.y, t.r);
+      if(!h) continue;
+      if(t.hand && t.hand!==h){
+        if(p.wrongCd<=0){ p.wrongCd=1.4; addFloat(t.x, t.y - t.r - 26, (t.hand==='R'?'みぎて':'ひだりて')+'で さわってね', t.color); SFX.wrong(); }
+        continue;
+      }
+      if(now - t.lastT > 450) tone(740,.08,'triangle',.15);
+      t.lastT = now; t.by = h;
+    }
+    const aOn = now - p.a.lastT < 450, bOn = now - p.b.lastT < 450;
+    if(aOn && bOn && p.a.by !== p.b.by){
+      p.state='out'; p.outT=0; pl.score++;
+      burst(p.a.x, p.a.y, p.a.color, p.a.r); burst(p.b.x, p.b.y, p.b.color, p.b.r);
+      addFloat((p.a.x+p.b.x)/2, (p.a.y+p.b.y)/2, 'そろった！', '#1E2833', Math.max(32, p.a.r*0.6), 0.9);
+      SFX.hit(); pl.spawnT = 0.45;
+    }else if((aOn || bOn) && p.hintCd<=0){
+      p.hintCd = 2.5; const t = aOn ? p.b : p.a;
+      addFloat(t.x, t.y - t.r - 26, 'こっちも！', t.color, null, 1.0);
+    }
+  }
+  pairs = pairs.filter(p=>!(p.state==='out' && p.outT>0.4));
+}
+function drawBoth(now){
+  for(const p of pairs){
+    let s=1, a=1;
+    if(p.state==='in'){ const q=Math.min(1,p.age/0.28); s = 1 + 2.4*Math.pow(q-1,3) + 1.4*Math.pow(q-1,2); if(p.age>=0.28) p.state='live'; }
+    if(p.state==='out'){ const q=Math.min(1,p.outT/0.4); s = 1 + q*0.3; a = 1-q; }
+    ctx.save(); ctx.globalAlpha = a*0.7; ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=Math.max(4, MIN*0.007); ctx.setLineDash([10,14]); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(p.a.x, p.a.y); ctx.lineTo(p.b.x, p.b.y); ctx.stroke(); ctx.restore();
+    for(const t of [p.a, p.b]){
+      const lit = now - t.lastT < 450;
+      drawBall(t.x, t.y, t.r*s*(lit?1.1:1), t.color, t.hand ? (t.hand==='R'?'みぎ':'ひだり') : null, {alpha:a, lit});
+    }
+  }
+}
+
+/* ================= じゅんばんモード ================= */
+const HIRA = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん'.split('');
+const HEADS = 'あかさたなはまやらわ'.split('');
+const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const abc = ABC.map(c=>c.toLowerCase());
+function orderSeq(){
+  const n = S.orderCount, d = S.orderDir==='down' ? -1 : 1, out = [];
+  if(S.orderKind==='num'){
+    for(let i=0;i<n;i++){ const v = S.orderNumStart + d*i*S.orderNumStep; if(v<0) break; out.push(String(v)); }
+  }else if(S.orderKind==='hira'){
+    if(S.orderHiraStep==='row'){
+      let hi = 0; HEADS.forEach((h,k)=>{ if(HIRA.indexOf(h) <= S.orderHiraStart) hi = k; });
+      for(let i=0;i<n;i++){ const j = hi + d*i; if(j<0 || j>=HEADS.length) break; out.push(HEADS[j]); }
+    }else{
+      for(let i=0;i<n;i++){ const j = S.orderHiraStart + d*i; if(j<0 || j>=HIRA.length) break; out.push(HIRA[j]); }
+    }
+  }else{
+    const L = S.orderKind==='ABC' ? ABC : abc;
+    for(let i=0;i<n;i++){ const j = S.orderAbcStart + d*i*S.orderAbcStep; if(j<0 || j>=L.length) break; out.push(L[j]); }
+  }
+  return out;
+}
+function orderRound(pl){
+  const seq = orderSeq(), z = zoneOf(pl);
+  let r = MIN*SIZE_R[S.size], toks = [];
+  for(let tries=0; tries<10; tries++){
+    toks = []; let fail = false;
+    const m = r + MIN*0.03, x0 = z.xa+m, x1 = z.xb-m, y0 = HUDH + r + MIN*0.06, y1 = H-m;
+    for(let i=0;i<seq.length;i++){
+      let pos = null;
+      for(let k=0;k<100;k++){
+        const p = {x:x0 + Math.random()*Math.max(1,x1-x0), y:y0 + Math.random()*Math.max(1,y1-y0)};
+        if(toks.every(t=>Math.hypot(t.x-p.x, t.y-p.y) > r*2.4)){ pos = p; break; }
+      }
+      if(!pos){ fail = true; break; }
+      toks.push({label:seq[i], i, x:pos.x, y:pos.y, r, done:false, doneT:0, wrongCd:0, age:0});
+    }
+    if(!fail) break;
+    r *= 0.88;
+  }
+  pl.ord = {toks, next:0, wait:0, hintCd:0};
+}
+function updateOrder(dt, now){
+  for(const pl of players){
+    if(!pl.ord) orderRound(pl);
+    const o = pl.ord; o.hintCd = Math.max(0, o.hintCd-dt);
+    if(o.wait > 0){ o.wait -= dt; if(o.wait <= 0) orderRound(pl); continue; }
+    for(const t of o.toks){
+      t.age += dt; t.wrongCd = Math.max(0, t.wrongCd-dt);
+      if(t.done){ t.doneT += dt; continue; }
+      if(t.age < 0.3) continue;
+      const h = touchingHand(pl, t.x, t.y, t.r);
+      if(!h) continue;
+      if(t.i === o.next){
+        t.done = true; o.next++; pl.score++; pl.byHand[h]++;
+        burst(t.x, t.y, handColor(pl,h), t.r);
+        tone(523*Math.pow(2, Math.min(t.i,12)/12), .18, 'triangle', .22);
+        if(o.next >= o.toks.length){
+          pl.rounds = (pl.rounds||0) + 1; o.wait = 1.6;
+          const z = zoneOf(pl);
+          addFloat((z.xa+z.xb)/2, H*0.5, 'ぜんぶ できた！', handColor(pl,'R'), Math.max(44, MIN*0.08), 1.5);
+          SFX.end();
+        }
+      }else if(t.wrongCd<=0 && o.hintCd<=0){
+        t.wrongCd = 1.5; o.hintCd = 1.0;
+        addFloat(t.x, t.y - t.r - 26, 'つぎは '+o.toks[o.next].label+' だよ', '#1E2833');
+        SFX.wrong();
+      }
+    }
+  }
+}
+function drawOrder(now){
+  for(const pl of players){
+    const o = pl.ord; if(!o) continue;
+    const color = handColor(pl, 'R');
+    for(const t of o.toks){
+      const pop = Math.min(1, t.age/0.3), s = t.done ? 0.85 : (0.6 + 0.4*pop);
+      if(t.done){
+        drawBall(t.x, t.y, t.r*s, '#C9D2DC', t.label, {alpha:0.55, textColor:'#5A6878', shape:'circle'});
+      }else{
+        const isNext = S.orderHint && t.i===o.next;
+        if(isNext){
+          ctx.save(); ctx.strokeStyle='#FFFFFF'; ctx.globalAlpha=0.9; ctx.lineWidth=Math.max(5, t.r*0.12);
+          ctx.beginPath(); ctx.arc(t.x, t.y, t.r*(1.3 + 0.12*Math.sin(now/180)), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+        }
+        drawBall(t.x, t.y, t.r*s, color, t.label, {shape:'circle', lit:isNext});
+      }
+    }
+    if(S.orderHint && o.next < o.toks.length){
+      const z = zoneOf(pl), x = two() ? (z.xa+z.xb)/2 : W/2, y = two() ? HUDH + MIN*0.04 : HUDH*0.5;
+      canvasLabel('つぎは '+o.toks[o.next].label, x, y, Math.max(28, MIN*0.045), '#1E2833');
+    }
+  }
+}
+
+/* ================= ストップモード ================= */
+const STOP_TOL = { easy:0.09, normal:0.06, hard:0.04 };
+const STOP_MOVE = { short:[3,5], normal:[5,8], long:[8,12] };
+let stopSt = null;
+function moveDur(){ const a = STOP_MOVE[S.stopMove]; return a[0] + Math.random()*(a[1]-a[0]); }
+function stopSetup(){ stopSt = {phase:'move', t:0, dur:moveDur()}; }
+function updateStop(dt, now){
+  const st = stopSt; st.t += dt;
+  if(st.phase==='move'){
+    updateTouch(dt, now, 2);
+    if(st.t >= st.dur){
+      st.phase='stop'; st.t=0; st.dur=S.stopLen;
+      targets.forEach(t=>{ if(t.state!=='out'){ t.state='out'; t.outT=0; } });
+      for(const pl of players) pl.stop = {anch:{}, moved:false};
+      setMsg('ストップ！', 'そのまま うごかないでね', {bar:true, color:'#E03A3A', tint:true});
+      msgBarI.style.width='100%';
+      tone(523,.22,'triangle',.25); tone(392,.4,'triangle',.25,.18);
+    }
+    return;
+  }
+  targets.forEach(t=>{ if(t.state==='out') t.outT += dt; });
+  targets = targets.filter(t=>!(t.state==='out' && t.outT>0.35));
+  msgBarI.style.width = Math.max(0, 100*(1 - st.t/st.dur)) + '%';
+  const tol = MIN*STOP_TOL[S.stopStrict];
+  for(const pl of players){
+    const s = pl.stop; if(!s || !pl.active) continue;
+    for(const h of ['R','L']){
+      if(!usesHand(h)) continue;
+      const hd = pl.hands[h]; if(!hd.seen) continue;
+      if(st.t >= 0.45 && !s.anch[h]) s.anch[h] = {x:hd.x, y:hd.y};
+      const a = s.anch[h];
+      if(a && !s.moved && Math.hypot(hd.x-a.x, hd.y-a.y) > tol){
+        s.moved = true; addFloat(hd.x, hd.y - handR()*2, 'うごいちゃった', '#1E2833'); tone(330,.2,'sine',.1);
+      }
+    }
+  }
+  if(st.t >= st.dur){
+    for(const pl of players){
+      pl.stopN = (pl.stopN||0) + 1;
+      const s = pl.stop;
+      if(s && !s.moved && Object.keys(s.anch).length){
+        pl.stopOK = (pl.stopOK||0) + 1;
+        for(const h in s.anch){ const a = s.anch[h]; burst(a.x, a.y, handColor(pl,h), handR()*1.6); }
+        const z = zoneOf(pl); addFloat((z.xa+z.xb)/2, H*0.45, 'ぴたっ！ できた', handColor(pl,'R'), Math.max(40, MIN*0.07), 1.3);
+      }
+      pl.spawnT = 0.3;
+    }
+    SFX.reg();
+    st.phase='move'; st.t=0; st.dur=moveDur();
+    setMsg('うごいて！', null, {big:true, word:true, color:'#1FA85A', pop:true});
+    clearTimeout(msgTimer); msgTimer = setTimeout(()=>{ if(phase==='play' && stopSt && stopSt.phase==='move') setMsg(null); }, 900);
+  }
+}
+function drawStop(now){
+  for(const t of targets) drawTarget(t, now);
+  if(!stopSt || stopSt.phase!=='stop') return;
+  ctx.save(); ctx.fillStyle='rgba(224,58,58,0.08)'; ctx.fillRect(0, HUDH, W, H-HUDH); ctx.restore();
+  const tol = MIN*STOP_TOL[S.stopStrict];
+  for(const pl of players){
+    const s = pl.stop; if(!s) continue;
+    for(const h in s.anch){
+      const a = s.anch[h];
+      ctx.save(); ctx.setLineDash([8,10]); ctx.lineWidth=Math.max(4, MIN*0.006);
+      ctx.strokeStyle = s.moved ? 'rgba(90,104,120,0.7)' : 'rgba(255,255,255,0.95)';
+      ctx.beginPath(); ctx.arc(a.x, a.y, tol + handR(), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    }
+  }
+}
+
+/* ================= なかまわけモード ================= */
+const SORT_SETS = {
+  fv:{ names:['くだもの','やさい'], icons:[{kind:'apple'},{kind:'ninjin'}],
+    pick(){ const c = Math.random()<0.5 ? 0 : 1, a = c ? KINDS.veg : KINDS.fruit; return {cat:c, kind:a[Math.floor(Math.random()*a.length)]}; } },
+  color:{ names:['あか','あお'], icons:[{kind:'balloon', color:'#E03A3A'},{kind:'balloon', color:'#2C6BDF'}],
+    pick(){ const c = Math.random()<0.5 ? 0 : 1, a = c ? ['#2C6BDF','#1A4FB5','#4C8DF6'] : ['#E03A3A','#C92A2A','#F25C54'];
+      const kinds = ['balloon','disc','tri']; return {cat:c, kind:kinds[Math.floor(Math.random()*3)], color:a[Math.floor(Math.random()*a.length)]}; } },
+  shape:{ names:['まる','さんかく'], icons:[{kind:'disc', color:'#5A6878'},{kind:'tri', color:'#5A6878'}],
+    pick(){ const c = Math.random()<0.5 ? 0 : 1; return {cat:c, kind:c ? 'tri' : 'disc', color:BALLOON_COL[Math.floor(Math.random()*BALLOON_COL.length)]}; } }
+};
+function sortBoxes(pl){
+  const z = zoneOf(pl), zw = z.xb - z.xa, m = MIN*0.03;
+  if(S.sortBox==='side'){
+    const w = zw*0.24, h = (H-HUDH)*0.42, y = HUDH + (H-HUDH-h)*0.6;
+    return [{x:z.xa+m, y, w, h}, {x:z.xb-m-w, y, w, h}];
+  }
+  const w = zw*0.32, h = (H-HUDH)*0.3, y = H - m - h;
+  return [{x:z.xa+m, y, w, h}, {x:z.xb-m-w, y, w, h}];
+}
+function sortHome(pl){ const z = zoneOf(pl), r = MIN*SIZE_R[S.size]; return {x:(z.xa+z.xb)/2, y:HUDH + r + (H-HUDH)*0.1}; }
+function sortSpawn(pl){
+  const p = SORT_SETS[S.sortSet].pick(), home = sortHome(pl), r = MIN*SIZE_R[S.size];
+  pl.sort.item = Object.assign(p, {x:home.x, y:home.y, r, state:'wait', t:0, hand:null, lost:0, idle:0});
+}
+const inBox = (x,y,b)=> x>b.x && x<b.x+b.w && y>b.y && y<b.y+b.h;
+function updateSort(dt, now){
+  for(const pl of players){
+    if(!pl.sort) pl.sort = {item:null, wait:0.2, hintCd:0};
+    const s = pl.sort; s.hintCd = Math.max(0, s.hintCd-dt);
+    if(!s.item){ s.wait -= dt; if(s.wait<=0) sortSpawn(pl); continue; }
+    const it = s.item, home = sortHome(pl), boxes = sortBoxes(pl);
+    it.t += dt;
+    if(it.state==='wait'){
+      it.x = home.x; it.y = home.y + Math.sin(now/300)*it.r*0.08;
+      it.idle += dt;
+      if(it.t > 0.3){
+        const h = touchingHand(pl, it.x, it.y, it.r*1.1);
+        if(h){ it.state='held'; it.hand=h; it.lost=0; it.idle=0; tone(700,.08,'triangle',.18); }
+      }
+      if(it.idle > 6 && s.hintCd<=0){ s.hintCd = 6; addFloat(it.x, it.y + it.r + 30, 'てで さわって はこんでね', '#1E2833'); }
+    }else if(it.state==='held'){
+      const hd = pl.hands[it.hand];
+      if(!pl.active || !hd.seen){ it.lost += dt; if(it.lost > 0.4) it.state='back'; }
+      else{
+        it.lost = 0; const f = 1 - Math.exp(-dt*22);
+        it.x += (hd.x-it.x)*f; it.y += (hd.y-it.y)*f;
+        for(let k=0;k<2;k++){
+          if(!inBox(it.x, it.y, boxes[k])) continue;
+          if(k === it.cat){
+            it.state='in'; it.t=0; it.box=boxes[k]; pl.score++; pl.byHand[it.hand]++;
+            burst(boxes[k].x+boxes[k].w/2, boxes[k].y+boxes[k].h/2, handColor(pl, it.hand), Math.min(boxes[k].w, boxes[k].h)*0.4);
+            addFloat(boxes[k].x+boxes[k].w/2, boxes[k].y - 24, 'せいかい！', '#1E2833', Math.max(32, MIN*0.05), 1.0);
+            SFX.hit();
+          }else{
+            it.state='back';
+            addFloat(it.x, it.y - it.r - 26, 'ちがう はこだよ', '#1E2833'); SFX.wrong();
+          }
+          break;
+        }
+      }
+    }else if(it.state==='back'){
+      const f = 1 - Math.exp(-dt*6);
+      it.x += (home.x-it.x)*f; it.y += (home.y-it.y)*f;
+      if(Math.hypot(home.x-it.x, home.y-it.y) < 6){ it.state='wait'; it.t=0.3; it.idle=0; }
+    }else if(it.state==='in'){
+      const b = it.box, f = 1 - Math.exp(-dt*10);
+      it.x += (b.x+b.w/2-it.x)*f; it.y += (b.y+b.h*0.6-it.y)*f;
+      if(it.t > 0.45){ s.item = null; s.wait = 0.35; }
+    }
+  }
+}
+function drawSortItem(c, it, r){
+  if(it.kind==='disc'){ c.beginPath(); c.arc(0,0,r*0.9,0,Math.PI*2); c.fillStyle=it.color; c.fill(); c.lineWidth=Math.max(3,r*0.08); c.strokeStyle='#FFFFFF'; c.stroke(); }
+  else if(it.kind==='tri'){ c.beginPath(); c.moveTo(0,-r*0.95); c.lineTo(r*0.95,r*0.7); c.lineTo(-r*0.95,r*0.7); c.closePath(); c.fillStyle=it.color; c.fill(); c.lineWidth=Math.max(3,r*0.08); c.lineJoin='round'; c.strokeStyle='#FFFFFF'; c.stroke(); }
+  else drawItemShape(c, it.kind, it.kind==='balloon' ? r*0.8 : r, it.color);
+}
+function drawSort(now){
+  const set = SORT_SETS[S.sortSet];
+  for(const pl of players){
+    const boxes = sortBoxes(pl), it = pl.sort && pl.sort.item;
+    boxes.forEach((b,k)=>{
+      const hover = it && it.state==='held' && inBox(it.x, it.y, b);
+      ctx.save();
+      const rr = Math.min(b.w, b.h)*0.12;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(b.x, b.y, b.w, b.h, rr) : ctx.rect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = hover ? 'rgba(255,247,194,0.92)' : 'rgba(255,255,255,0.82)'; ctx.fill();
+      ctx.lineWidth = hover ? Math.max(8, MIN*0.012) : Math.max(5, MIN*0.007); ctx.strokeStyle = hover ? handColor(pl, it.hand) : '#5A6878'; ctx.stroke();
+      ctx.restore();
+      const fs = Math.max(26, Math.min(b.w*0.2, b.h*0.22));
+      canvasLabel(set.names[k], b.x+b.w/2, b.y + fs*0.85, fs, '#1E2833');
+      const ic = set.icons[k], ir = Math.min(b.w, b.h)*0.2;
+      ctx.save(); ctx.translate(b.x+b.w/2, b.y + b.h*0.62); ctx.globalAlpha = 0.85; drawSortItem(ctx, ic, ir); ctx.restore();
+    });
+    if(!it) continue;
+    let sc = 1;
+    if(it.state==='wait' && it.t < 0.3) sc = 0.5 + 0.5*Math.min(1, it.t/0.3);
+    if(it.state==='in') sc = Math.max(0.1, 1 - it.t/0.45);
+    ctx.save(); ctx.translate(it.x, it.y);
+    if(it.state==='held'){ const g = glowSprite(handColor(pl, it.hand)), gs = it.r*2.4; ctx.drawImage(g, -gs, -gs, gs*2, gs*2); }
+    ctx.scale(sc, sc); drawSortItem(ctx, it, it.r);
+    ctx.restore();
+  }
+}
+
+/* ================= なぞりモード ================= */
+const TRACE_TW = { wide:0.095, normal:0.07, thin:0.05 };
+const TRACE_LIST = ['circle','tri','square','heart','star','wave','zig','num'];
+function arcPts(cx,cy,rx,ry,a0,a1,n){ const o=[]; for(let i=0;i<=n;i++){ const a=a0+(a1-a0)*i/n; o.push([cx+Math.cos(a)*rx, cy+Math.sin(a)*ry]); } return o; }
+const PI = Math.PI;
+const DIGITS = {
+  '0':[arcPts(.5,.5,.4,.47,-PI/2,-PI/2-2*PI,60)],
+  '1':[[[.3,.22],[.55,.04],[.55,.96]]],
+  '2':[arcPts(.5,.3,.32,.26,-PI*0.95,PI*0.25,30).concat([[.15,.95],[.88,.95]])],
+  '3':[arcPts(.48,.27,.32,.23,-PI*0.85,PI*0.5,26).concat(arcPts(.48,.72,.36,.25,-PI*0.5,PI*0.85,28))],
+  '4':[[[.62,.04],[.12,.68],[.9,.68]], [[.66,.3],[.66,.96]]],
+  '5':[[[.3,.05],[.24,.46]].concat(arcPts(.5,.68,.33,.28,-PI*0.75,PI*0.8,30)), [[.3,.05],[.85,.05]]],
+  '6':[[[.7,.05],[.45,.22],[.3,.45]].concat(arcPts(.5,.7,.25,.25,PI,-PI,40))],
+  '7':[[[.12,.07],[.88,.07],[.42,.96]]],
+  '8':[(()=>{ const o=[]; for(let i=0;i<=80;i++){ const t=i/80*2*PI; o.push([.5 - .28*Math.sin(2*t), .5 - .46*Math.cos(t)]); } return o; })()],
+  '9':[arcPts(.5,.3,.26,.25,0,-2*PI,40).concat([[.68,.96]])]
+};
+function shapeStrokes(name){
+  let strokes, fixed = false;
+  if(name.length===1 && DIGITS[name]){ strokes = DIGITS[name]; fixed = true; }
+  else if(name==='circle') strokes = [arcPts(.5,.5,.5,.5,-PI/2,PI*1.5,64)];
+  else if(name==='tri') strokes = [[[.5,0],[1,.9],[0,.9],[.5,0]]];
+  else if(name==='square') strokes = [[[0,0],[1,0],[1,1],[0,1],[0,0]]];
+  else if(name==='heart'){ const o=[]; for(let i=0;i<=80;i++){ const t=i/80*2*PI; o.push([16*Math.pow(Math.sin(t),3), -(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))]); } strokes=[o]; }
+  else if(name==='star'){ const o=[]; for(const i of [0,2,4,1,3,0]){ const a=-PI/2+i*2*PI/5; o.push([Math.cos(a), Math.sin(a)]); } strokes=[o]; }
+  else if(name==='wave'){ const o=[]; for(let i=0;i<=60;i++){ const x=i/60; o.push([x*2.4, Math.sin(x*2*PI*2)*0.5]); } strokes=[o]; }
+  else strokes = [[[0,0],[.6,1],[1.2,0],[1.8,1],[2.4,0]]];
+  if(fixed) return {strokes, asp:0.62};
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  strokes.forEach(s=>s.forEach(([x,y])=>{ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }));
+  const w = x1-x0||1, h = y1-y0||1;
+  return { strokes: strokes.map(s=>s.map(([x,y])=>[(x-x0)/w, (y-y0)/h])), asp: w/h };
+}
+function resample(pts, sp){
+  const out = [pts[0].slice()];
+  let carry = 0;
+  for(let i=1;i<pts.length;i++){
+    const [ax,ay] = pts[i-1], [bx,by] = pts[i], L = Math.hypot(bx-ax, by-ay);
+    let d = sp - carry;
+    while(d <= L){ const q = d/L; out.push([ax+(bx-ax)*q, ay+(by-ay)*q]); d += sp; }
+    carry = L - (d - sp);
+  }
+  const last = pts[pts.length-1];
+  if(Math.hypot(out[out.length-1][0]-last[0], out[out.length-1][1]-last[1]) > sp*0.3) out.push(last.slice());
+  return out;
+}
+function traceNew(pl){
+  const prev = pl.tr ? pl.tr.name : null;
+  let name;
+  for(let k=0;k<10;k++){
+    let n = S.traceShape==='mix' ? TRACE_LIST[Math.floor(Math.random()*TRACE_LIST.length)] : S.traceShape;
+    if(n==='num') n = String(Math.floor(Math.random()*10));
+    name = n; if(name!==prev) break;
+  }
+  const {strokes, asp} = shapeStrokes(name);
+  const z = zoneOf(pl), tol = MIN*TRACE_TW[S.traceWidth], m = tol + MIN*0.04;
+  const x0 = z.xa+m, x1 = z.xb-m, y0 = HUDH + tol + MIN*0.03, y1 = H - m;
+  const hgt = Math.min(y1-y0, (x1-x0)/asp)*0.95, wid = hgt*asp;
+  const ox = (x0+x1)/2 - wid/2, oy = (y0+y1)/2 - hgt/2, sp = MIN*0.016;
+  const px = strokes.map(s=>resample(s.map(([x,y])=>[ox + x*wid, oy + y*hgt]), sp));
+  pl.tr = {name, strokes:px, si:0, pi:0, done:false, doneT:0, idle:0, hintCd:3, sp, lastHand:'R'};
+}
+function updateTrace(dt, now){
+  const tol = MIN*TRACE_TW[S.traceWidth];
+  for(const pl of players){
+    if(!pl.tr) traceNew(pl);
+    const T = pl.tr;
+    if(T.done){ T.doneT += dt; if(T.doneT > 1.5) traceNew(pl); continue; }
+    T.idle += dt; T.hintCd = Math.max(0, T.hintCd-dt);
+    const pts = T.strokes[T.si], look = Math.max(3, Math.ceil(tol*1.5/T.sp));
+    let best = -1, bh = null;
+    if(pl.active){
+      for(const h of ['R','L']){
+        if(!usesHand(h)) continue;
+        const hd = pl.hands[h]; if(!hd.seen || hd.a < 0.5) continue;
+        for(let j=T.pi; j<=Math.min(T.pi+look, pts.length-1); j++){
+          if(Math.hypot(hd.x-pts[j][0], hd.y-pts[j][1]) < tol && j > best){ best = j; bh = h; }
+        }
+      }
+    }
+    if(best >= T.pi){
+      T.pi = best + 1; T.idle = 0; T.lastHand = bh;
+      if(Math.random() < 0.6) spark(pts[best][0], pts[best][1], handColor(pl, bh), 2, 1);
+    }
+    if(T.pi >= pts.length){
+      T.si++; T.pi = 0;
+      if(T.si >= T.strokes.length){
+        T.done = true; T.doneT = 0; pl.score++; pl.byHand[T.lastHand]++;
+        T.strokes.forEach(s=>{ for(let i=0;i<s.length;i+=Math.max(1, Math.floor(s.length/8))) burst(s[i][0], s[i][1], handColor(pl, T.lastHand), tol*0.6); });
+        const z = zoneOf(pl); addFloat((z.xa+z.xb)/2, H*0.5, 'できた！', handColor(pl,'R'), Math.max(48, MIN*0.09), 1.4);
+        SFX.end();
+      }else{
+        tone(880,.12,'triangle',.2);
+      }
+    }
+    if(!T.done && T.idle > 4 && T.hintCd<=0){
+      T.hintCd = 5; const p = T.strokes[T.si][Math.min(T.pi, T.strokes[T.si].length-1)];
+      addFloat(p[0], p[1] - tol - 30, 'ひかっている ところから なぞってね', '#1E2833', null, 2.0);
+    }
+  }
+}
+function polyline(pts, n){
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for(let i=1;i<Math.min(n, pts.length);i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+}
+function drawTrace(now){
+  const tol = MIN*TRACE_TW[S.traceWidth];
+  for(const pl of players){
+    const T = pl.tr; if(!T) continue;
+    const color = handColor(pl, T.lastHand || 'R');
+    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+    // なぞる道
+    T.strokes.forEach(s=>{
+      ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=tol*1.4; polyline(s, s.length);
+      ctx.strokeStyle='rgba(90,104,120,0.55)'; ctx.lineWidth=Math.max(3, tol*0.14); ctx.setLineDash([tol*0.35, tol*0.35]); polyline(s, s.length); ctx.setLineDash([]);
+    });
+    // なぞったところ
+    ctx.strokeStyle = color; ctx.lineWidth = tol*0.85; ctx.shadowColor = color; ctx.shadowBlur = T.done ? tol*1.2 : tol*0.5;
+    T.strokes.forEach((s,k)=>{
+      if(T.done || k < T.si) polyline(s, s.length);
+      else if(k === T.si && T.pi > 1) polyline(s, T.pi);
+    });
+    ctx.shadowBlur = 0;
+    // つぎに なぞるところ
+    if(!T.done){
+      const s = T.strokes[T.si], p = s[Math.min(T.pi, s.length-1)], q = s[Math.min(T.pi + 8, s.length-1)];
+      const rr = tol*0.55*(1 + 0.15*Math.sin(now/160));
+      const g = glowSprite(color), gs = rr*3; ctx.drawImage(g, p[0]-gs, p[1]-gs, gs*2, gs*2);
+      ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+      ctx.lineWidth = Math.max(4, rr*0.25); ctx.strokeStyle='#FFFFFF'; ctx.stroke();
+      const a = Math.atan2(q[1]-p[1], q[0]-p[0]);
+      if(Math.hypot(q[0]-p[0], q[1]-p[1]) > 2){
+        ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(rr*2.1, 0); ctx.lineTo(rr*1.3, -rr*0.6); ctx.lineTo(rr*1.3, rr*0.6); ctx.closePath();
+        ctx.fillStyle='#FFFFFF'; ctx.fill(); ctx.restore();
+      }
+      if(T.pi === 0) canvasLabel('ここから', p[0], p[1] - rr - Math.max(22, MIN*0.03), Math.max(26, MIN*0.04), color);
+    }
     ctx.restore();
   }
 }
@@ -1604,9 +2218,10 @@ function draw(now){
   }
 
   // 的
-  if(S.mode==='chase') drawChase(now);
-  else if(S.mode==='slash') drawSlash(now);
-  else for(const t of targets) drawTarget(t, now);
+  if(phase==='play' || phase==='countdown' || gameStarted){
+    const fn = {slash:drawSlash, chase:drawChase, both:drawBoth, order:drawOrder, stop:drawStop, sort:drawSort, trace:drawTrace}[S.mode];
+    if(fn) fn(now); else for(const t of targets) drawTarget(t, now);
+  }
 
   // 粒
   for(const p of particles){
@@ -1622,7 +2237,7 @@ function draw(now){
   ctx.globalAlpha = 1;
 
   // 手
-  for(const pl of players) if(pl.active) for(const h of ['L','R']) drawHand(pl, pl.hands[h], now);
+  for(const pl of players) if(pl.active) for(const h of ['L','R']) if(usesHand(h)) drawHand(pl, pl.hands[h], now);
 
   // 文字
   for(const f of floats){
@@ -1632,7 +2247,9 @@ function draw(now){
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.lineWidth = Math.max(6, f.size*0.22); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
     const fy = Math.max(f.y, HUDH + f.size*0.7);
-    ctx.strokeText(f.text, f.x, fy); ctx.fillStyle=f.color; ctx.fillText(f.text, f.x, fy);
+    const hw = ctx.measureText(f.text).width/2 + f.size*0.3;
+    const fx = Math.max(hw, Math.min(W - hw, f.x));
+    ctx.strokeText(f.text, fx, fy); ctx.fillStyle=f.color; ctx.fillText(f.text, fx, fy);
     ctx.restore();
   }
 }
@@ -1712,7 +2329,7 @@ function drawHand(pl, hd, now){
   ctx.lineWidth = r*0.28; ctx.strokeStyle = color; ctx.stroke();
   ctx.beginPath(); ctx.arc(hd.x, hd.y, r*0.32, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
   // ラベル（左右を使うときだけ）
-  if(S.hands!=='both' || (S.lr && !two())){
+  if(S.hands!=='both' || designated()){
     const fs = Math.round(Math.max(18, r*0.62));
     ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.lineWidth = Math.max(4, fs*0.22); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
