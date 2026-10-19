@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>からだであそぼう</title>
+<title>ポーズでゲーム</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
@@ -90,6 +90,8 @@ ruby rt{font-size:.5em;font-weight:400}
 .help .t{font-size:15px;color:var(--sub);line-height:1.9;border-top:1px solid var(--line);padding-top:10px}
 .privacy{margin-top:22px;padding:12px 14px;border-radius:12px;background:var(--off);font-size:15px;line-height:2;color:var(--ink)}
 .privacy b{display:block;font-size:16px}
+.seg button .sw{display:inline-block;width:22px;height:22px;border-radius:50%;vertical-align:-5px;margin-right:6px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+.seg button.on .sw{box-shadow:0 0 0 2px #fff}
 .chk{display:flex;align-items:center;gap:10px;font-size:16px;min-height:48px}
 .chk input{width:26px;height:26px}
 
@@ -158,8 +160,8 @@ ruby rt{font-size:.5em;font-weight:400}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       せってい</button>
   </div>
-  <h1 class="title">からだで あそぼう</h1>
-  <p class="lead">カメラが<span style="color:var(--right);font-weight:700">みぎて</span>と<span style="color:var(--left);font-weight:700">ひだりて</span>を よみとるよ。<br>あそびを えらんで「はじめる」を おしてね。</p>
+  <h1 class="title">ポーズで ゲーム</h1>
+  <p class="lead">カメラが みぎてと ひだりてを よみとるよ。<br>あそびを えらんで「はじめる」を おしてね。</p>
   <div class="modes" id="modes"></div>
   <div class="pplrow"><span class="lab">にんずう</span><div class="seg" id="pplSeg"></div></div>
   <p class="summary" id="summary"></p>
@@ -246,14 +248,16 @@ const COL = { R:'#F07A18', L:'#2C6BDF', N:'#1FA85A' };
 const HAND_LM = { R:{w:16,i:20,p:18,s:12}, L:{w:15,i:19,p:17,s:11} };
 const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
 const STORE_KEY = 'karadaAsobi_v2';
-const PCOL = ['#F07A18', '#7C4DDB'];
 const HELP_KEY = 'karadaAsobi_help_v1';
 
 /* ================= 設定 ================= */
 const DEF = {
   mode:'touch', players:1, team:'vs', camera:'user', mirror:true, video:'full', model:'full',
   time:30, hands:'both', lr:false, side:'any', area:'edge',
-  size:'m', shape:'circle', count:1, life:'normal', sound:true
+  size:'m', shape:'circle', count:1, life:'normal', sound:true,
+  colOne:'#F07A18', colR:'#F07A18', colL:'#2C6BDF', colP1:'#F07A18', colP2:'#7C4DDB',
+  chasePath:'mix', chaseSpeed:'normal',
+  slashKind:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3
 };
 let S = Object.assign({}, DEF);
 try{ const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if(s && typeof s === 'object') S = Object.assign({}, DEF, s); }catch(e){}
@@ -263,8 +267,8 @@ const R_ = (k,r)=>'<ruby>'+k+'<rt>'+r+'</rt></ruby>';
 
 const MODES = [
   {id:'touch', name:'タッチ', desc:'あちこちに '+R_('出','で')+'る '+R_('的','まと')+'に タッチ', ok:true},
-  {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける'},
-  {id:'slash', name:'きる', desc:'とんでくる ものを きる'},
+  {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける', ok:true},
+  {id:'slash', name:'きる', desc:'とんでくる ものを きる', ok:true},
   {id:'both', name:'りょうて', desc:'ふたつ '+R_('同時','どうじ')+'に タッチ'},
   {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに'},
   {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる'},
@@ -272,11 +276,49 @@ const MODES = [
   {id:'trace', name:'なぞり', desc:R_('大','おお')+'きな '+R_('形','かたち')+'を なぞる'}
 ];
 
+const COLORS = [['#F07A18','オレンジ'],['#E03A3A','あか'],['#E5487A','ピンク'],['#D99A00','きいろ'],['#1FA85A','みどり'],['#1AA6C9','みずいろ'],['#2C6BDF','あお'],['#7C4DDB','むらさき']];
+// 1人のときに、右手と左手を分けて使うか
+const designated = ()=> S.players===1 && (S.hands!=='both' || S.lr);
+const MODE_NAME = {touch:'タッチ', chase:'おいかけ', slash:'きる'};
+
 const SCHEMA = [
   {grp:'あそびかた'},
   {key:'players', label:'にんずう', type:'seg', opts:[[1,'ひとり'],[2,'ふたり']]},
   {key:'team', label:'ふたりのとき', type:'seg', opts:[['vs','きょうそう'],['coop','きょうりょく']], show:()=>S.players===2,
     hint:'きょうりょく：ふたりの '+R_('数','かず')+'を あわせるよ。ふたりのときは、'+R_('画面','がめん')+'の '+R_('左','ひだり')+'と '+R_('右','みぎ')+'に わかれて、それぞれの がわに '+R_('的','まと')+'が '+R_('出','で')+'るよ。'},
+  {key:'time', label:R_('時間','じかん'), type:'step', min:10, max:300, step:10, unit:'秒'},
+  {key:'hands', label:R_('使','つか')+'う'+R_('手','て'), type:'seg', opts:[['both',R_('両手','りょうて')],['R',R_('右手','みぎて')+'だけ'],['L',R_('左手','ひだりて')+'だけ']]},
+  {key:'lr', label:R_('左右','さゆう')+'の'+R_('指定','してい'), type:'seg', opts:[[false,'なし'],[true,'あり']], show:()=>S.hands==='both' && S.players===1,
+    hint:'「あり」にすると、'+R_('右手','みぎて')+'と '+R_('左手','ひだりて')+'が べつの '+R_('色','いろ')+'に なって、'+R_('的','まと')+'にも '+R_('同','おな')+'じ '+R_('色','いろ')+'と「みぎ」「ひだり」が つくよ。'},
+  {key:'colOne', label:R_('手','て')+'の'+R_('色','いろ'), type:'color', show:()=>S.players===1 && !designated()},
+  {key:'colR', label:R_('右手','みぎて')+'の'+R_('色','いろ'), type:'color', show:()=>designated()},
+  {key:'colL', label:R_('左手','ひだりて')+'の'+R_('色','いろ'), type:'color', show:()=>designated()},
+  {key:'colP1', label:R_('左','ひだり')+'がわの'+R_('人','ひと'), type:'color', show:()=>S.players===2},
+  {key:'colP2', label:R_('右','みぎ')+'がわの'+R_('人','ひと'), type:'color', show:()=>S.players===2},
+  {key:'size', label:R_('的','まと')+'の'+R_('大','おお')+'きさ', type:'seg', opts:[['s',R_('小','しょう')],['m',R_('中','ちゅう')],['l',R_('大','だい')]]},
+  {key:'shape', label:R_('的','まと')+'の'+R_('形','かたち'), type:'seg', opts:[['circle','まる'],['star','ほし'],['heart','ハート']], show:()=>S.mode!=='slash'},
+
+  {grp:'タッチの せってい', mode:['touch']},
+  {key:'side', label:R_('的','まと')+'の'+R_('場所','ばしょ'), type:'seg', opts:[['any','どこでも'],['same',R_('同','おな')+'じがわ'],['opp',R_('反対','はんたい')+'がわ']],
+    show:()=>designated(),
+    hint:R_('同','おな')+'じがわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('体','からだ')+'の '+R_('右','みぎ')+'がわに '+R_('出','で')+'るよ。'+R_('反対','はんたい')+'がわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('左','ひだり')+'がわに '+R_('出','で')+'るよ（'+R_('体','からだ')+'の まんなかを こえる うごき）。'},
+  {key:'area', label:R_('出','で')+'るところ', type:'seg', opts:[['edge','はしっこ'+R_('多','おお')+'め'],['all',R_('画面','がめん')+'ぜんたい']]},
+  {key:'count', label:R_('画面','がめん')+'に'+R_('出','で')+'る'+R_('数','かず'), type:'step', min:1, max:4, step:1, unit:'こ',
+    hint:'タッチすると すぐ つぎが '+R_('出','で')+'て、いつも この '+R_('数','かず')+'だけ '+R_('出','で')+'ているよ。ふたりのときは ひとりずつ この '+R_('数','かず')+'だよ。'},
+  {key:'life', label:R_('消','き')+'えるまで', type:'seg', opts:[['none',R_('消','き')+'えない'],['slow','ゆっくり'],['normal','ふつう'],['fast','はやい']]},
+
+  {grp:'おいかけの せってい', mode:['chase']},
+  {key:'chasePath', label:R_('動','うご')+'きかた', type:'seg', opts:[['mix','いろいろ'],['lr','よこ'],['ud','たて'],['zig','ジグザグ'],['wave','なみ'],['circle','まる'],['eight','8の'+R_('字','じ')],['heart','ハート'],['spiral','うずまき'],['bounce','はねる'],['fuwa','ふわふわ'],['stopgo','とまって'+R_('動','うご')+'く']],
+    hint:'いろいろ：12'+R_('秒','びょう')+'ごとに '+R_('動','うご')+'きかたが かわるよ。'+R_('的','まと')+'に '+R_('手','て')+'を かさねている '+R_('時間','じかん')+'で ポイントが ふえるよ（1'+R_('秒','びょう')+'で 1ポイント）。'},
+  {key:'chaseSpeed', label:'はやさ', type:'seg', opts:[['slow','ゆっくり'],['normal','ふつう'],['fast','はやい']]},
+
+  {grp:'きるの せってい', mode:['slash']},
+  {key:'slashKind', label:'とぶもの', type:'seg', opts:[['mix','いろいろ'],['balloon','ふうせん'],['fruit','くだもの'],['veg','やさい']]},
+  {key:'slashSpeed', label:'はやさ', type:'seg', opts:[['slow','ゆっくり'],['normal','ふつう'],['fast','はやい']]},
+  {key:'slashEase', label:'きれやすさ', type:'seg', opts:[['easy','やさしい'],['normal','ふつう'],['hard','むずかしい']],
+    hint:R_('手','て')+'を すばやく '+R_('動','うご')+'かすと きれるよ。ゆっくり さわっても きれないよ。やさしい：すこし はやければ きれるよ。'},
+  {key:'slashCount', label:R_('画面','がめん')+'に'+R_('出','で')+'る'+R_('数','かず'), type:'step', min:1, max:6, step:1, unit:'こ'},
+
   {grp:'カメラ'},
   {key:'camera', label:'カメラ', type:'seg', opts:[['user','インカメラ'],['environment',R_('背面','はいめん')+'カメラ']]},
   {key:'mirror', label:R_('左右','さゆう')+R_('反転','はんてん'), type:'seg', opts:[[true,'あり（かがみ）'],[false,'なし']],
@@ -285,20 +327,6 @@ const SCHEMA = [
     hint:'「なし」のときは '+R_('体','からだ')+'の '+R_('線','せん')+'だけ うすく '+R_('出','で')+'るよ。'},
   {key:'model', label:R_('読','よ')+'み'+R_('取','と')+'り', type:'seg', opts:[['full','せいかく'],['lite','はやい']],
     hint:'うごきが おそく '+R_('感','かん')+'じるときは「はやい」に してね。'},
-  {grp:'タッチ'},
-  {key:'time', label:R_('時間','じかん'), type:'step', min:10, max:300, step:10, unit:'秒'},
-  {key:'hands', label:R_('使','つか')+'う'+R_('手','て'), type:'seg', opts:[['both',R_('両手','りょうて')],['R',R_('右手','みぎて')+'だけ'],['L',R_('左手','ひだりて')+'だけ']]},
-  {key:'lr', label:R_('左右','さゆう')+'の'+R_('指定','してい'), type:'seg', opts:[[false,'なし'],[true,'あり']], show:()=>S.hands==='both' && S.players===1,
-    hint:'「あり」にすると、'+R_('的','まと')+'に '+R_('手','て')+'と '+R_('同','おな')+'じ '+R_('色','いろ')+'と「みぎ」「ひだり」が つくよ。'},
-  {key:'side', label:R_('的','まと')+'の'+R_('場所','ばしょ'), type:'seg', opts:[['any','どこでも'],['same',R_('同','おな')+'じがわ'],['opp',R_('反対','はんたい')+'がわ']],
-    show:()=>S.players===1 && (S.hands!=='both' || S.lr),
-    hint:R_('同','おな')+'じがわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('体','からだ')+'の '+R_('右','みぎ')+'がわに '+R_('出','で')+'るよ。'+R_('反対','はんたい')+'がわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('左','ひだり')+'がわに '+R_('出','で')+'るよ（'+R_('体','からだ')+'の まんなかを こえる うごき）。'},
-  {key:'area', label:R_('出','で')+'るところ', type:'seg', opts:[['edge','はしっこ'+R_('多','おお')+'め'],['all',R_('画面','がめん')+'ぜんたい']]},
-  {key:'size', label:R_('的','まと')+'の'+R_('大','おお')+'きさ', type:'seg', opts:[['s',R_('小','しょう')],['m',R_('中','ちゅう')],['l',R_('大','だい')]]},
-  {key:'shape', label:R_('的','まと')+'の'+R_('形','かたち'), type:'seg', opts:[['circle','まる'],['star','ほし'],['heart','ハート']]},
-  {key:'count', label:R_('画面','がめん')+'に'+R_('出','で')+'る'+R_('数','かず'), type:'step', min:1, max:4, step:1, unit:'こ',
-    hint:'タッチすると すぐ つぎが '+R_('出','で')+'て、いつも この '+R_('数','かず')+'だけ '+R_('出','で')+'ているよ。ふたりのときは ひとりずつ この '+R_('数','かず')+'だよ。'},
-  {key:'life', label:R_('消','き')+'えるまで', type:'seg', opts:[['none',R_('消','き')+'えない'],['slow','ゆっくり'],['normal','ふつう'],['fast','はやい']]},
   {grp:'その'+R_('他','ほか')},
   {key:'sound', label:R_('効果音','こうかおん'), type:'seg', opts:[[true,'あり'],[false,'なし']]}
 ];
@@ -339,7 +367,7 @@ function renderModes(){
     b.className = 'mode' + (S.mode===m.id ? ' sel':'');
     b.innerHTML = '<b>'+m.name+'</b><span>'+m.desc+'</span>' + (m.ok ? '' : '<span class="tag">じゅんびちゅう</span>');
     b.disabled = !m.ok;
-    b.addEventListener('click', ()=>{ S.mode=m.id; saveS(); renderModes(); });
+    b.addEventListener('click', ()=>{ S.mode=m.id; saveS(); renderModes(); renderSummary(); });
     box.appendChild(b);
   });
 }
@@ -353,11 +381,14 @@ function renderPpl(){
 }
 function renderSummary(){
   const parts = [];
+  parts.push('<b>'+(MODE_NAME[S.mode]||'')+'</b>');
   parts.push('<b>'+S.time+'秒</b>');
+  if(S.mode==='chase'){ const o=SCHEMA.find(x=>x.key==='chasePath').opts.find(x=>x[0]===S.chasePath); if(o) parts.push(o[1]); }
+  if(S.mode==='slash'){ const o=SCHEMA.find(x=>x.key==='slashKind').opts.find(x=>x[0]===S.slashKind); if(o) parts.push(o[1]); }
   if(S.players===2) parts.push('ふたりで'+(S.team==='coop'?'きょうりょく':'きょうそう'));
   parts.push(S.hands==='both' ? R_('両手','りょうて') : S.hands==='R' ? R_('右手','みぎて')+'だけ' : R_('左手','ひだりて')+'だけ');
   if(S.hands==='both' && S.players===1) parts.push(R_('左右','さゆう')+'の'+R_('指定','してい')+(S.lr?'あり':'なし'));
-  if(S.players===1 && (S.hands!=='both' || S.lr)) parts.push(S.side==='any'?'どこでも':S.side==='same'?R_('同','おな')+'じがわ':R_('反対','はんたい')+'がわ');
+  if(S.mode==='touch' && designated()) parts.push(S.side==='any'?'どこでも':S.side==='same'?R_('同','おな')+'じがわ':R_('反対','はんたい')+'がわ');
   parts.push(S.camera==='user'?'インカメラ':R_('背面','はいめん')+'カメラ');
   $('summary').innerHTML = 'いまの せってい： ' + parts.join(' ・ ');
 }
@@ -365,14 +396,21 @@ function renderSummary(){
 /* ================= 設定パネル ================= */
 function renderSettings(){
   const body = $('setBody'); body.innerHTML='';
+  let grpOn = true;
   SCHEMA.forEach(it=>{
-    if(it.grp){ const g=document.createElement('div'); g.className='grp'; g.innerHTML=it.grp; body.appendChild(g); return; }
+    if(it.grp){
+      grpOn = !it.mode || it.mode.includes(S.mode);
+      if(grpOn){ const g=document.createElement('div'); g.className='grp'; g.innerHTML=it.grp; body.appendChild(g); }
+      return;
+    }
+    if(!grpOn) return;
     if(it.show && !it.show()) return;
     const row = document.createElement('div'); row.className='row';
     const lab = document.createElement('label'); lab.innerHTML = it.label; row.appendChild(lab);
-    if(it.type==='seg'){
+    if(it.type==='seg' || it.type==='color'){
       const seg = document.createElement('div'); seg.className='seg';
-      it.opts.forEach(([v,t])=>{
+      const opts = it.type==='color' ? COLORS.map(([c,n])=>[c,'<i class="sw" style="background:'+c+'"></i>'+n]) : it.opts;
+      opts.forEach(([v,t])=>{
         const b=document.createElement('button'); b.innerHTML=t;
         if(S[it.key]===v) b.className='on';
         b.addEventListener('click', ()=>{ S[it.key]=v; saveS(); renderSettings(); renderSummary(); renderPpl(); });
@@ -554,13 +592,13 @@ OneEuro.prototype.reset = function(){ this.x=new LowPass(); this.dx=new LowPass(
 
 function makeHand(id){
   return { id, seen:false, tx:0, ty:0, x:0, y:0, px:0, py:0, a:0, lastSeen:0, trail:[],
-    fx:new OneEuro(1.2, 0.012), fy:new OneEuro(1.2, 0.012), init:false, speed:0 };
+    fx:new OneEuro(1.2, 0.012), fy:new OneEuro(1.2, 0.012), init:false, speed:0, vs:0 };
 }
 
 /* ================= あそぶ人（1人または2人） ================= */
 function makePlayer(i){
   return { i, active:false, cx:0, cy:0, sw:0, lm:null, lastSeen:0, lsx:undefined, rsx:undefined,
-    hands:{ R:makeHand('R'), L:makeHand('L') }, score:0, byHand:{R:0,L:0}, color:PCOL[i], spawnT:0, lastAssign:[] };
+    hands:{ R:makeHand('R'), L:makeHand('L') }, score:0, byHand:{R:0,L:0}, color:pColor(i), spawnT:0, lastAssign:[] };
 }
 let players = [];
 let colorsFixed = false;
@@ -569,7 +607,11 @@ function resetPlayers(){
   for(let i=0;i<S.players;i++) players.push(makePlayer(i));
 }
 const two = ()=> players.length===2;
-function handColor(pl, h){ return two() ? (colorsFixed ? pl.color : COL.N) : COL[h]; }
+function pColor(i){ return i===0 ? S.colP1 : S.colP2; }
+function handColor(pl, h){
+  if(two()) return colorsFixed ? pl.color : '#12906A';
+  return designated() ? (h==='R' ? S.colR : S.colL) : S.colOne;
+}
 function sideName(pl){ return pl.i===0 ? R_('左','ひだり')+'がわ' : R_('右','みぎ')+'がわ'; }
 
 /* ================= 人の登録と追跡 ================= */
@@ -678,7 +720,7 @@ async function startStage(){
 function newGame(){
   remain = S.time;
   for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; }
-  targets = []; particles = []; floats = [];
+  targets = []; particles = []; floats = []; chasers = []; items = []; pieces = [];
   gameStarted = false;
   hudScore.hidden = true; hudTime.hidden = true; hudScore2.hidden = true; hudGrow2.hidden = true;
   updateHud();
@@ -708,6 +750,7 @@ function enterCountdown(){
 }
 function enterPlay(){
   phase = 'play'; gameStarted = true;
+  if(S.mode==='chase' && !chasers.length) chaseSetup();
   updateHud();
   hudScore.hidden=false; hudTime.hidden=false;
   hudScore2.hidden=!two(); hudGrow2.hidden=!two();
@@ -722,6 +765,8 @@ function endGame(){
   renderResult();
   show(scrResult);
 }
+function scoreWord(){ return S.mode==='chase' ? 'ポイント' : S.mode==='slash' ? 'きった' : 'タッチ'; }
+function scoreTitle(){ return S.mode==='chase' ? 'ポイント' : S.mode==='slash' ? 'きった'+R_('数','かず') : 'タッチした'+R_('数','かず'); }
 function renderResult(){
   const box = $('resBoxes'); box.innerHTML=''; box.className='lr';
   const mk = (label, n, color)=>{
@@ -733,15 +778,15 @@ function renderResult(){
   const num=$('resNum'), lbl=$('resLbl');
   if(!two()){
     const pl = players[0];
-    lbl.innerHTML = 'タッチした'+R_('数','かず'); num.hidden=false; num.textContent = pl.score;
-    mk(R_('右手','みぎて'), pl.byHand.R, COL.R);
-    mk(R_('左手','ひだりて'), pl.byHand.L, COL.L);
+    lbl.innerHTML = scoreTitle(); num.hidden=false; num.textContent = pl.score;
+    mk(R_('右手','みぎて'), pl.byHand.R, handColor(pl,'R'));
+    mk(R_('左手','ひだりて'), pl.byHand.L, handColor(pl,'L'));
   }else if(S.team==='coop'){
-    lbl.innerHTML = 'ふたりで タッチした'+R_('数','かず'); num.hidden=false;
+    lbl.innerHTML = 'ふたりで '+scoreTitle(); num.hidden=false;
     num.textContent = players[0].score + players[1].score;
     players.forEach(pl=>mk(sideName(pl), pl.score, pl.color));
   }else{
-    lbl.innerHTML = 'タッチした'+R_('数','かず'); num.hidden=true;
+    lbl.innerHTML = scoreTitle(); num.hidden=true;
     box.className='lr wide';
     players.forEach(pl=>mk(sideName(pl), pl.score, pl.color));
   }
@@ -770,11 +815,11 @@ $('btnHome').addEventListener('click', goHome);
 function updateHud(){
   hudTime.textContent = 'のこり ' + Math.max(0, Math.ceil(remain)) + '秒';
   if(!two()){
-    hudScore.textContent = 'タッチ ' + (players[0] ? players[0].score : 0);
+    hudScore.textContent = scoreWord() + ' ' + (players[0] ? players[0].score : 0);
     hudScore.style.boxShadow = '';
   }else{
-    hudScore.textContent = 'タッチ ' + players[0].score;
-    hudScore2.textContent = 'タッチ ' + players[1].score;
+    hudScore.textContent = scoreWord() + ' ' + players[0].score;
+    hudScore2.textContent = scoreWord() + ' ' + players[1].score;
     hudScore.style.boxShadow = 'inset 0 0 0 5px '+players[0].color+', 0 2px 8px rgba(0,0,0,.15)';
     hudScore2.style.boxShadow = 'inset 0 0 0 5px '+players[1].color+', 0 2px 8px rgba(0,0,0,.15)';
   }
@@ -851,7 +896,7 @@ function onDetection(now){
         if(two() && !colorsFixed){
           // 画面の左にいる人を1人目（オレンジ）にする
           players.sort((a,b)=>a.cx-b.cx);
-          players.forEach((p,i)=>{ p.i=i; p.color=PCOL[i]; });
+          players.forEach((p,i)=>{ p.i=i; p.color=pColor(i); });
         }
         colorsFixed = true;
         enterCountdown();
@@ -896,10 +941,11 @@ function loop(now){
         hd.a = Math.min(1, hd.a + dt*6);
         hd.trail.push({x:hd.x, y:hd.y, t:now});
         hd.speed = Math.hypot(hd.x-hd.px, hd.y-hd.py)/dt;
+        hd.vs = hd.vs*0.45 + hd.speed*0.55;
         if(hd.speed > MIN*1.2 && Math.random() < 0.5*k) spark(hd.x, hd.y, handColor(pl,h), 1, 0.6);
       }else{
         hd.a = Math.max(0, hd.a - dt*4);
-        hd.speed = 0;
+        hd.speed = 0; hd.vs = 0;
       }
       while(hd.trail.length && now - hd.trail[0].t > 320) hd.trail.shift();
       if(!hd.seen && hd.trail.length) hd.trail.shift();
@@ -918,7 +964,9 @@ function loop(now){
 
   if(phase==='play'){
     remain -= dt;
-    updateTouch(dt, now);
+    if(S.mode==='chase') updateChase(dt, now);
+    else if(S.mode==='slash') updateSlash(dt, now);
+    else updateTouch(dt, now);
     if(remain <= 0){ remain = 0; updateHud(); endGame(); return; }
     updateHud();
   }
@@ -1004,7 +1052,7 @@ function spawnTarget(pl){
     const ex = sideDir ? (sideDir>0 ? W - r - MIN*0.04 : r + MIN*0.04) : (z.xa+z.xb)/2;
     pos = { x: ex, y: HUDH + r + (H-HUDH-2*r)*Math.random() };
   }
-  const color = two() ? pl.color : (hand ? COL[hand] : COL.N);
+  const color = handColor(pl, hand || 'R');
   targets.push({ x:pos.x, y:pos.y, r, hand, owner:pl, color, age:0, life:LIFE[S.life], state:'in', outT:0, wrongCd:0, spin:Math.random()*Math.PI*2 });
 }
 
@@ -1053,6 +1101,385 @@ function updateTouch(dt, now){
     }
   }
   targets = targets.filter(t=> t.state!=='hit' && !(t.state==='out' && t.outT>0.35));
+}
+
+/* ================= おいかけモード ================= */
+const CHASE_SPD = { slow:0.6, normal:1, fast:1.5 };
+const CHASE_KINDS = ['lr','ud','zig','wave','circle','eight','heart','spiral','bounce','fuwa','stopgo'];
+let chasers = [];
+const tri = u => { const f = u - Math.floor(u); return f<0.5 ? f*4-1 : 3-f*4; };   // -1→1→-1
+const ease = q => q<0.5 ? 2*q*q : 1-Math.pow(-2*q+2,2)/2;
+
+function chaseRect(pl, r){
+  const z = zoneOf(pl), m = r + MIN*0.05;
+  const x0 = z.xa + m, x1 = z.xb - m, y0 = HUDH + r + 10, y1 = H - m;
+  return { cx:(x0+x1)/2, cy:(y0+y1)/2, ax:Math.max(4,(x1-x0)/2), ay:Math.max(4,(y1-y0)/2) };
+}
+function newChasePath(c, kind){
+  c.kind = kind; c.t = 0;
+  c.n0 = (Math.random()*2-1)*0.6;
+  c.ph = [Math.random()*6.28, Math.random()*6.28, Math.random()*6.28, Math.random()*6.28];
+  c.dir = Math.random()<0.5 ? 1 : -1;
+  if(kind==='bounce'){ const a = Math.random()*Math.PI*2; c.bx=c.nx||0; c.by=c.ny||0; c.vx=Math.cos(a); c.vy=Math.sin(a); }
+  if(kind==='stopgo'){ c.sgx=c.nx||0; c.sgy=c.ny||0; c.sgFrom=[c.sgx,c.sgy]; c.sgTo=[c.sgx,c.sgy]; c.sgT=1; c.sgHold=1.2; }
+}
+// その動きでの位置（-1〜1 の正規化した座標と、縦横を同じ比率にするか）
+function chaseStep(c, dt){
+  const sp = CHASE_SPD[S.chaseSpeed];
+  c.t += dt*sp;
+  const t = c.t, d = c.dir, p = c.ph;
+  switch(c.kind){
+    case 'lr': return [tri(t/7 + 0.25), c.n0, false];
+    case 'ud': return [c.n0, tri(t/6 + 0.25), false];
+    case 'zig': return [tri(t/10 + 0.25), tri(t/2.4)*0.85, false];
+    case 'wave': return [tri(t/10 + 0.25), Math.sin(t*2*Math.PI/3.2)*0.8, false];
+    case 'circle': { const a = d*t*2*Math.PI/7 + p[0]; return [Math.cos(a)*0.95, Math.sin(a)*0.95, true]; }
+    case 'eight': { const a = d*t*2*Math.PI/10 + p[0]; return [Math.sin(a), Math.sin(2*a)*0.85, false]; }
+    case 'heart': {
+      const a = d*t*2*Math.PI/10;
+      const x = 16*Math.pow(Math.sin(a),3)/17;
+      const y = -(13*Math.cos(a) - 5*Math.cos(2*a) - 2*Math.cos(3*a) - Math.cos(4*a))/17 + 0.15;
+      return [x, y, true];
+    }
+    case 'spiral': {
+      const a = d*t*2*Math.PI/4.5 + p[0];
+      const rr = 0.18 + 0.8*(0.5 - 0.5*Math.cos(t*2*Math.PI/16));
+      return [Math.cos(a)*rr, Math.sin(a)*rr, true];
+    }
+    case 'bounce': {
+      const v = 0.42*sp;
+      c.bx += c.vx*v*dt; c.by += c.vy*v*dt;
+      if(c.bx>1){ c.bx=1; c.vx=-Math.abs(c.vx); } if(c.bx<-1){ c.bx=-1; c.vx=Math.abs(c.vx); }
+      if(c.by>1){ c.by=1; c.vy=-Math.abs(c.vy); } if(c.by<-1){ c.by=-1; c.vy=Math.abs(c.vy); }
+      return [c.bx, c.by, false];
+    }
+    case 'fuwa': {
+      const x = 0.62*Math.sin(t*0.53 + p[0]) + 0.35*Math.sin(t*0.91 + p[1]);
+      const y = 0.62*Math.sin(t*0.47 + p[2]) + 0.35*Math.sin(t*0.83 + p[3]);
+      return [x, y, false];
+    }
+    case 'stopgo': {
+      if(c.sgT < 1){
+        c.sgT = Math.min(1, c.sgT + dt*sp/0.55);
+        const q = ease(c.sgT);
+        c.sgx = c.sgFrom[0] + (c.sgTo[0]-c.sgFrom[0])*q; c.sgy = c.sgFrom[1] + (c.sgTo[1]-c.sgFrom[1])*q;
+      }else{
+        c.sgHold -= dt*sp;
+        if(c.sgHold <= 0){
+          c.sgFrom = [c.sgx, c.sgy];
+          let nx, ny, k=0;
+          do{ nx = Math.random()*2-1; ny = Math.random()*2-1; k++; }while(Math.hypot(nx-c.sgx, ny-c.sgy) < 0.9 && k<20);
+          c.sgTo = [nx, ny]; c.sgT = 0; c.sgHold = 1.0 + Math.random()*1.4;
+        }
+      }
+      return [c.sgx, c.sgy, false];
+    }
+  }
+  return [0,0,false];
+}
+function pickChaseKind(not){
+  if(S.chasePath!=='mix') return S.chasePath;
+  let k; do{ k = CHASE_KINDS[Math.floor(Math.random()*CHASE_KINDS.length)]; }while(k===not);
+  return k;
+}
+function chaseSetup(){
+  chasers = players.map(pl=>{
+    const c = { pl, x:W/2, y:H/2, nx:0, ny:0, hold:0, on:false, hand:null, handT:0, mixT:0, blend:1, from:[0,0], trail:[] };
+    c.hand = nextHand(pl);
+    newChasePath(c, pickChaseKind(null));
+    const r = MIN*SIZE_R[S.size];
+    const st = chaseStep(c, 0), R = chaseRect(pl, r);
+    const a = st[2] ? Math.min(R.ax, R.ay) : null;
+    c.x = R.cx + st[0]*(a||R.ax); c.y = R.cy + st[1]*(a||R.ay);
+    return c;
+  });
+}
+function updateChase(dt, now){
+  const r = MIN*SIZE_R[S.size], hr = handR();
+  for(const c of chasers){
+    const pl = c.pl;
+    // いろいろ：ときどき動き方をかえる
+    if(S.chasePath==='mix'){
+      c.mixT += dt;
+      if(c.mixT > 12){ c.mixT = 0; c.from = [c.x, c.y]; c.blend = 0; c.nx=0; c.ny=0; newChasePath(c, pickChaseKind(c.kind)); }
+    }
+    // 左右の指定があるとき：10秒ごとに手をかえる
+    if(!two() && S.lr && S.hands==='both'){
+      c.handT += dt;
+      if(c.handT > 10){
+        c.handT = 0; c.hand = c.hand==='R' ? 'L' : 'R';
+        floats.push({x:c.x, y:c.y - r - 30, text:'こんどは '+(c.hand==='R'?'みぎて':'ひだりて'), color:handColor(pl,c.hand), t:0, max:1.6, size:Math.max(26, MIN*0.045)});
+      }
+    }
+    const st = chaseStep(c, dt), R = chaseRect(pl, r);
+    const a = st[2] ? Math.min(R.ax, R.ay) : null;
+    let x = R.cx + st[0]*(a||R.ax), y = R.cy + st[1]*(a||R.ay);
+    if(c.blend < 1){ c.blend = Math.min(1, c.blend + dt/0.9); const q = ease(c.blend); x = c.from[0] + (x-c.from[0])*q; y = c.from[1] + (y-c.from[1])*q; }
+    c.x = x; c.y = y;
+    c.trail.push({x, y, t:now}); while(c.trail.length && now - c.trail[0].t > 600) c.trail.shift();
+
+    // 手が重なっている時間でポイント
+    c.on = false; let onHand = null;
+    if(pl.active){
+      for(const h of ['R','L']){
+        if(c.hand && c.hand!==h) continue;
+        const hd = pl.hands[h];
+        if(!hd.seen || hd.a < 0.5) continue;
+        if(Math.hypot(hd.x-x, hd.y-y) < r + hr*0.5){ c.on = true; onHand = h; break; }
+      }
+    }
+    if(c.on){
+      c.hold += dt;
+      if(Math.random() < dt*30) spark(x + (Math.random()-0.5)*r, y + (Math.random()-0.5)*r, c.color||handColor(pl, onHand), 1, 1);
+      if(c.hold >= 1){
+        c.hold -= 1; pl.score++; pl.byHand[onHand]++;
+        burst(x, y, handColor(pl, c.hand||onHand), r*0.8);
+        floats.push({x, y:y - r - 12, text:'+1', color:'#1E2833', t:0, max:0.8, size:Math.max(30, r*0.6)});
+        SFX.hit();
+      }
+    }else{
+      c.hold = Math.max(0, c.hold - dt*0.15);
+    }
+    c.color = handColor(pl, c.hand || 'R');
+  }
+}
+function drawChase(now){
+  const r = MIN*SIZE_R[S.size];
+  for(const c of chasers){
+    const color = c.color || handColor(c.pl, c.hand||'R');
+    const lw = Math.max(4, r*0.11);
+    ctx.save();
+    // うごいた あと
+    for(let i=0;i<c.trail.length;i+=3){
+      const p = c.trail[i], q = i/c.trail.length;
+      ctx.globalAlpha = q*0.25; ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r*(0.35+q*0.5), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const s = c.on ? 1.12 + Math.sin(now/90)*0.03 : 1 + Math.sin(now/260)*0.03;
+    const rr = r*s;
+    if(c.on){ const g = glowSprite(color), gs = rr*2.4; ctx.drawImage(g, c.x-gs, c.y-gs, gs*2, gs*2); }
+    shapePath(ctx, S.shape, c.x, c.y, rr + lw*0.9); ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.fill();
+    shapePath(ctx, S.shape, c.x, c.y, rr); ctx.fillStyle = color; ctx.fill();
+    // 1ポイントまでの すすみぐあい
+    ctx.beginPath(); ctx.arc(c.x, c.y, rr + lw*2.6, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth = lw*1.2; ctx.stroke();
+    if(c.hold > 0.01){
+      ctx.beginPath(); ctx.arc(c.x, c.y, rr + lw*2.6, -Math.PI/2, -Math.PI/2 + Math.PI*2*c.hold);
+      ctx.strokeStyle = color; ctx.lineWidth = lw*1.2; ctx.lineCap='round'; ctx.stroke();
+    }
+    if(c.hand){
+      const fs = Math.round(r*(S.shape==='star'?0.36:0.44));
+      ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const ty = c.y + (S.shape==='heart' ? rr*0.08 : 0);
+      ctx.lineWidth = Math.max(3, fs*0.18); ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineJoin='round';
+      ctx.strokeText(c.hand==='R'?'みぎ':'ひだり', c.x, ty);
+      ctx.fillStyle='#FFFFFF'; ctx.fillText(c.hand==='R'?'みぎ':'ひだり', c.x, ty);
+    }
+    ctx.restore();
+  }
+}
+
+/* ================= きるモード ================= */
+const SLASH_G = { slow:0.5, normal:0.75, fast:1.05 };
+const SLASH_CUT = { easy:0.55, normal:0.85, hard:1.25 };
+const KINDS = {
+  balloon:['balloon'],
+  fruit:['apple','mikan','suika','momo'],
+  veg:['tomato','nasu','ninjin','piman'],
+  mix:['balloon','apple','mikan','suika','momo','tomato','nasu','ninjin','piman']
+};
+const BALLOON_COL = ['#E03A3A','#F07A18','#E8B10C','#1FA85A','#1AA6C9','#2C6BDF','#7C4DDB','#E5487A'];
+const ITEM_NAME = {balloon:'パン！', apple:'スパッ！', mikan:'スパッ！', suika:'スパッ！', momo:'スパッ！', tomato:'スパッ！', nasu:'スパッ！', ninjin:'スパッ！', piman:'スパッ！'};
+const ITEM_JUICE = {apple:'#F4D9A8', mikan:'#F7A21B', suika:'#E8384F', momo:'#F7C6B0', tomato:'#E0352B', nasu:'#EDE6C8', ninjin:'#F07A18', piman:'#EAF5D0'};
+let items = [], pieces = [];
+let hintCd = 0;
+const cutSpeed = ()=> MIN*SLASH_CUT[S.slashEase];
+
+function spawnItem(pl){
+  const z = zoneOf(pl);
+  const kinds = KINDS[S.slashKind];
+  const kind = kinds[Math.floor(Math.random()*kinds.length)];
+  const r = MIN * SIZE_R[S.size] * (kind==='suika' ? 1.15 : 1);
+  const hand = nextHand(pl);
+  const mx = r + MIN*0.04;
+  const x0 = z.xa + mx + Math.random()*Math.max(1, z.xb - z.xa - 2*mx);
+  const bal = kind==='balloon';
+  const it = { pl, kind, r, hand, x:x0, y:H + r*1.2, rot:bal ? 0 : (Math.random()-0.5)*0.6, spin:bal ? 0 : (Math.random()-0.5)*2.2,
+    color: kind==='balloon' ? BALLOON_COL[Math.floor(Math.random()*BALLOON_COL.length)] : null, age:0, sway:Math.random()*6.28 };
+  const gsc = SLASH_G[S.slashSpeed];
+  if(kind==='balloon'){
+    it.vy = -H*0.16*gsc; it.vx = 0; it.g = 0;
+  }else{
+    const g = H*gsc, apexY = HUDH + r + Math.random()*(H*0.42 - HUDH);
+    const vy = -Math.sqrt(2*g*Math.max(H*0.3, it.y - apexY));
+    const tUp = -vy/g;
+    const xt = z.xa + mx + Math.random()*Math.max(1, z.xb - z.xa - 2*mx);
+    it.vx = (xt - x0)/tUp * 0.6; it.vy = vy; it.g = g;
+  }
+  items.push(it);
+}
+function updateSlash(dt, now){
+  hintCd = Math.max(0, hintCd - dt);
+  for(const pl of players){
+    const live = items.filter(i=>i.pl===pl).length;
+    pl.spawnT -= dt;
+    if(live < S.slashCount && pl.spawnT <= 0){ spawnItem(pl); pl.spawnT = (0.45 + Math.random()*0.5)/Math.sqrt(SLASH_G[S.slashSpeed]/0.75); }
+  }
+  const hr = handR(), cv = cutSpeed();
+  for(const it of items){
+    it.age += dt; it.rot += it.spin*dt;
+    it.vy += it.g*dt; it.x += it.vx*dt; it.y += it.vy*dt;
+    if(it.kind==='balloon'){ it.x += Math.sin(now/600 + it.sway)*MIN*0.0006*60*dt; it.rot = Math.sin(now/700 + it.sway)*0.12; }
+    if(it.dead) continue;
+    const pl = it.pl;
+    if(!pl.active || it.age < 0.15) continue;
+    for(const h of ['R','L']){
+      const hd = pl.hands[h];
+      if(!hd.seen || hd.a < 0.5) continue;
+      const d = segDist(it.x, it.y, hd.px, hd.py, hd.x, hd.y);
+      if(d > it.r + hr*0.35) continue;
+      if(hd.vs < cv){
+        if(hintCd<=0){ hintCd = 2.2; floats.push({x:it.x, y:it.y - it.r - 26, text:'シュッと うごかしてね', color:'#1E2833', t:0, max:1.3, size:Math.max(24, MIN*0.038)}); }
+        continue;
+      }
+      if(it.hand && it.hand!==h){
+        if(hintCd<=0){ hintCd = 1.6; floats.push({x:it.x, y:it.y - it.r - 26, text:(it.hand==='R'?'みぎて':'ひだりて')+'で きってね', color:handColor(pl,it.hand), t:0, max:1.3, size:Math.max(24, MIN*0.038)}); SFX.wrong(); }
+        continue;
+      }
+      cutItem(it, hd, h);
+      break;
+    }
+  }
+  items = items.filter(it=> !it.dead && it.y < H + it.r*2.5 && it.y > -it.r*3);
+  for(const p of pieces){ p.vy += p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.spin*dt; p.t += dt; }
+  pieces = pieces.filter(p=> p.t < 2.5 && p.y < H + p.r*3);
+}
+function cutItem(it, hd, h){
+  it.dead = true;
+  const pl = it.pl; pl.score++; pl.byHand[h]++;
+  const ang = Math.atan2(hd.y-hd.py, hd.x-hd.px);
+  const nx = -Math.sin(ang), ny = Math.cos(ang), sp = MIN*0.35;
+  if(it.kind==='balloon'){
+    burst(it.x, it.y, it.color, it.r);
+    for(let i=0;i<10;i++){ const a=Math.random()*6.28, s=(3+Math.random()*4)*(MIN/700);
+      particles.push({x:it.x, y:it.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:0, max:0.5+Math.random()*0.3, color:it.color, size:(6+Math.random()*6)*(MIN/700)}); }
+    tone(1200,.06,'square',.12); tone(300,.12,'triangle',.18,.02);
+  }else{
+    for(const sgn of [1,-1]){
+      pieces.push({ kind:it.kind, r:it.r, x:it.x + nx*sgn*it.r*0.08, y:it.y + ny*sgn*it.r*0.08,
+        vx: it.vx*0.5 + nx*sgn*sp, vy: Math.min(it.vy, 0)*0.3 + ny*sgn*sp - MIN*0.2, g: H*1.1,
+        rot: it.rot, spin: sgn*2.5, cut: ang - it.rot, side: sgn, t:0, color:it.color });
+    }
+    const jc = ITEM_JUICE[it.kind] || '#FFFFFF';
+    for(let i=0;i<16;i++){ const a=Math.random()*6.28, s=(2+Math.random()*5)*(MIN/700);
+      particles.push({x:it.x, y:it.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:0, max:0.45+Math.random()*0.35, color:jc, size:(3+Math.random()*5)*(MIN/700)}); }
+    SFX.hit();
+  }
+  floats.push({x:it.x, y:it.y - it.r*0.3, text:ITEM_NAME[it.kind], color:'#1E2833', t:0, max:0.8, size:Math.max(30, it.r*0.6)});
+}
+
+// 食べもの・ふうせんの絵（中心0,0・半径r）
+function drawItemShape(c, kind, r, color){
+  c.lineJoin='round'; c.lineCap='round';
+  const out = ()=>{ c.lineWidth = Math.max(3, r*0.07); c.strokeStyle='rgba(255,255,255,0.95)'; c.stroke(); };
+  switch(kind){
+    case 'balloon':
+      c.beginPath(); c.moveTo(0, r*0.98); c.quadraticCurveTo(r*0.12, r*1.35, -r*0.05, r*1.75); c.lineWidth=Math.max(2,r*0.04); c.strokeStyle='rgba(60,60,60,0.7)'; c.stroke();
+      c.beginPath(); c.ellipse(0, -r*0.05, r*0.82, r*1.0, 0, 0, Math.PI*2); c.fillStyle=color; c.fill(); out();
+      c.beginPath(); c.moveTo(-r*0.12, r*1.05); c.lineTo(r*0.12, r*1.05); c.lineTo(0, r*0.9); c.closePath(); c.fillStyle=color; c.fill();
+      c.beginPath(); c.ellipse(-r*0.3, -r*0.4, r*0.14, r*0.26, -0.5, 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.55)'; c.fill();
+      break;
+    case 'apple':
+      c.beginPath(); c.moveTo(0,-r*0.7); c.bezierCurveTo(r*0.6,-r*1.05, r*1.15,-r*0.35, r*0.85,r*0.45); c.bezierCurveTo(r*0.6,r*1.0, r*0.15,r*0.95, 0,r*0.8);
+      c.bezierCurveTo(-r*0.15,r*0.95, -r*0.6,r*1.0, -r*0.85,r*0.45); c.bezierCurveTo(-r*1.15,-r*0.35, -r*0.6,-r*1.05, 0,-r*0.7); c.closePath();
+      c.fillStyle='#D8282E'; c.fill(); out();
+      c.beginPath(); c.moveTo(0,-r*0.68); c.quadraticCurveTo(r*0.05,-r*1.0, r*0.12,-r*1.15); c.lineWidth=Math.max(3,r*0.08); c.strokeStyle='#6B4226'; c.stroke();
+      c.beginPath(); c.ellipse(r*0.32,-r*0.95, r*0.26, r*0.12, -0.5, 0, Math.PI*2); c.fillStyle='#3FA34D'; c.fill();
+      c.beginPath(); c.ellipse(-r*0.4,-r*0.2, r*0.12, r*0.22, 0.4, 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.4)'; c.fill();
+      break;
+    case 'mikan':
+      c.beginPath(); c.ellipse(0, r*0.05, r*0.98, r*0.88, 0, 0, Math.PI*2); c.fillStyle='#F39A1E'; c.fill(); out();
+      c.fillStyle='rgba(200,110,10,0.35)';
+      for(let i=0;i<9;i++){ const a=i*0.7, d=r*(0.3+0.4*((i*37)%10)/10); c.beginPath(); c.arc(Math.cos(a)*d, Math.sin(a)*d*0.85+r*0.05, r*0.04, 0, 6.28); c.fill(); }
+      c.beginPath(); c.arc(0,-r*0.8, r*0.1, 0, 6.28); c.fillStyle='#4E8A2E'; c.fill();
+      c.beginPath(); c.ellipse(r*0.22,-r*0.92, r*0.22, r*0.1, -0.3, 0, Math.PI*2); c.fillStyle='#3FA34D'; c.fill();
+      break;
+    case 'suika':
+      c.beginPath(); c.arc(0,0,r,0,Math.PI*2); c.fillStyle='#3E9B3A'; c.fill(); out();
+      c.save(); c.beginPath(); c.arc(0,0,r*0.97,0,Math.PI*2); c.clip();
+      c.strokeStyle='#1E5E22'; c.lineWidth=r*0.12;
+      for(let k=-2;k<=2;k++){ c.beginPath(); for(let j=0;j<=10;j++){ const y=-r+j*r*0.2, x=k*r*0.42 + (j%2? r*0.08 : -r*0.08); j? c.lineTo(x,y) : c.moveTo(x,y); } c.stroke(); }
+      c.restore();
+      break;
+    case 'momo':
+      c.beginPath(); c.moveTo(0,-r*0.85); c.bezierCurveTo(r*0.9,-r*0.95, r*1.05,r*0.5, 0,r*0.95); c.bezierCurveTo(-r*1.05,r*0.5, -r*0.9,-r*0.95, 0,-r*0.85); c.closePath();
+      c.fillStyle='#F6A6A0'; c.fill(); out();
+      c.beginPath(); c.moveTo(0,-r*0.8); c.quadraticCurveTo(-r*0.25,r*0.1, 0,r*0.9); c.lineWidth=Math.max(2,r*0.05); c.strokeStyle='rgba(210,90,90,0.5)'; c.stroke();
+      c.beginPath(); c.ellipse(r*0.35,-r*0.95, r*0.3, r*0.13, -0.4, 0, Math.PI*2); c.fillStyle='#3FA34D'; c.fill();
+      break;
+    case 'tomato':
+      c.beginPath(); c.ellipse(0, r*0.05, r, r*0.9, 0, 0, Math.PI*2); c.fillStyle='#E0352B'; c.fill(); out();
+      c.beginPath(); for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, d=i%2? r*0.14 : r*0.42; const x=Math.cos(a)*d, y=-r*0.72+Math.sin(a)*d*0.55; i? c.lineTo(x,y):c.moveTo(x,y);} c.closePath(); c.fillStyle='#3E8E2F'; c.fill();
+      c.beginPath(); c.ellipse(-r*0.4,-r*0.15, r*0.12, r*0.22, 0.4, 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.4)'; c.fill();
+      break;
+    case 'nasu':
+      c.save(); c.rotate(-0.5);
+      c.beginPath(); c.ellipse(0, r*0.2, r*0.62, r*0.95, 0, 0, Math.PI*2); c.fillStyle='#5B2C83'; c.fill(); out();
+      c.beginPath(); c.moveTo(-r*0.5,-r*0.55); c.quadraticCurveTo(0,-r*0.95, r*0.5,-r*0.55); c.lineTo(0,-r*0.4); c.closePath(); c.fillStyle='#3E7A2E'; c.fill();
+      c.beginPath(); c.rect(-r*0.07,-r*1.15, r*0.14, r*0.4); c.fill();
+      c.beginPath(); c.ellipse(-r*0.25,r*0.15, r*0.1, r*0.35, 0.1, 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.3)'; c.fill();
+      c.restore();
+      break;
+    case 'ninjin':
+      c.beginPath(); c.moveTo(-r*0.45,-r*0.55); c.quadraticCurveTo(0,-r*0.75, r*0.45,-r*0.55); c.quadraticCurveTo(r*0.2,r*0.4, 0,r*1.05); c.quadraticCurveTo(-r*0.2,r*0.4, -r*0.45,-r*0.55); c.closePath();
+      c.fillStyle='#F07A18'; c.fill(); out();
+      c.strokeStyle='rgba(170,80,10,0.5)'; c.lineWidth=Math.max(2,r*0.04);
+      for(const y of [-0.2,0.15,0.5]){ c.beginPath(); c.moveTo(-r*0.25, r*y); c.lineTo(-r*0.05, r*y); c.stroke(); }
+      c.fillStyle='#3FA34D';
+      for(const a of [-0.5,0,0.5]){ c.save(); c.translate(0,-r*0.65); c.rotate(a); c.beginPath(); c.ellipse(0,-r*0.3, r*0.1, r*0.32, 0, 0, Math.PI*2); c.fill(); c.restore(); }
+      break;
+    case 'piman':
+      c.beginPath(); c.moveTo(0,-r*0.6); c.bezierCurveTo(r*0.9,-r*0.9, r*1.05,r*0.3, r*0.4,r*0.9); c.quadraticCurveTo(0,r*0.7, -r*0.4,r*0.9);
+      c.bezierCurveTo(-r*1.05,r*0.3, -r*0.9,-r*0.9, 0,-r*0.6); c.closePath(); c.fillStyle='#2F9A3A'; c.fill(); out();
+      c.beginPath(); c.rect(-r*0.08,-r*0.95, r*0.16, r*0.38); c.fillStyle='#4F6B2A'; c.fill();
+      c.beginPath(); c.ellipse(-r*0.4,-r*0.1, r*0.1, r*0.25, 0.3, 0, Math.PI*2); c.fillStyle='rgba(255,255,255,0.35)'; c.fill();
+      break;
+  }
+}
+function drawSlash(now){
+  for(const it of items){
+    ctx.save(); ctx.translate(it.x, it.y);
+    if(it.hand){
+      ctx.beginPath(); ctx.arc(0, 0, it.r*1.25, 0, Math.PI*2);
+      ctx.fillStyle = handColor(it.pl, it.hand); ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1;
+    }
+    if(two()){ ctx.beginPath(); ctx.arc(0, 0, it.r*1.22, 0, Math.PI*2); ctx.lineWidth=Math.max(4, it.r*0.09); ctx.strokeStyle=it.pl.color; ctx.globalAlpha=0.8; ctx.stroke(); ctx.globalAlpha=1; }
+    ctx.rotate(it.rot);
+    drawItemShape(ctx, it.kind, it.r, it.color);
+    ctx.restore();
+    if(it.hand){
+      const fs = Math.round(Math.max(20, it.r*0.42));
+      ctx.save(); ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=Math.max(5, fs*0.24); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
+      const t = it.hand==='R'?'みぎ':'ひだり', ty = it.y + it.r*1.25 + fs*0.7;
+      ctx.strokeText(t, it.x, ty); ctx.fillStyle=handColor(it.pl, it.hand); ctx.fillText(t, it.x, ty); ctx.restore();
+    }
+  }
+  for(const p of pieces){
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - Math.max(0, p.t-1.6)/0.9);
+    ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    // 切り口で半分にする
+    ctx.save(); ctx.rotate(p.cut);
+    ctx.beginPath(); ctx.rect(-p.r*2, p.side>0 ? 0 : -p.r*2, p.r*4, p.r*2); ctx.clip();
+    ctx.rotate(-p.cut);
+    drawItemShape(ctx, p.kind, p.r, p.color);
+    ctx.rotate(p.cut);
+    ctx.beginPath(); ctx.moveTo(-p.r*0.95, 0); ctx.lineTo(p.r*0.95, 0);
+    ctx.lineWidth = Math.max(4, p.r*0.12); ctx.strokeStyle = ITEM_JUICE[p.kind] || '#FFF'; ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
 }
 
 /* ================= エフェクト ================= */
@@ -1169,7 +1596,9 @@ function draw(now){
   }
 
   // 的
-  for(const t of targets) drawTarget(t, now);
+  if(S.mode==='chase') drawChase(now);
+  else if(S.mode==='slash') drawSlash(now);
+  else for(const t of targets) drawTarget(t, now);
 
   // 粒
   for(const p of particles){
@@ -1194,7 +1623,8 @@ function draw(now){
     ctx.font = '700 '+Math.round(f.size)+'px "BIZ UDPGothic", sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.lineWidth = Math.max(6, f.size*0.22); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
-    ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle=f.color; ctx.fillText(f.text, f.x, f.y);
+    const fy = Math.max(f.y, HUDH + f.size*0.7);
+    ctx.strokeText(f.text, f.x, fy); ctx.fillStyle=f.color; ctx.fillText(f.text, f.x, fy);
     ctx.restore();
   }
 }
@@ -1257,6 +1687,12 @@ function drawHand(pl, hd, now){
       ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = r*0.35*q;
       ctx.beginPath(); ctx.moveTo(tr[i-1].x, tr[i-1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
     }
+  }
+  // きれる はやさの ときは 白く光る
+  if(S.mode==='slash' && phase==='play' && hd.vs >= cutSpeed() && tr.length > 2){
+    ctx.globalAlpha = hd.a; ctx.strokeStyle='#FFFFFF'; ctx.lineWidth = r*0.5; ctx.shadowColor = color; ctx.shadowBlur = r*0.8;
+    ctx.beginPath(); ctx.moveTo(tr[0].x, tr[0].y); for(let i=1;i<tr.length;i++) ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+    ctx.shadowBlur = 0;
   }
   // 光
   ctx.globalAlpha = hd.a;
