@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>からだであそぼう</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* 明るい教室向け。手の色（右オレンジ・左青）をアプリ全体の基準色にする */
+:root{
+  --bg:#F3F6F9;
+  --panel:#FFFFFF;
+  --ink:#1E2833;
+  --sub:#5A6878;
+  --line:#D5DDE6;
+  --main:#12906A;
+  --main-ink:#FFFFFF;
+  --right:#F07A18;
+  --left:#2C6BDF;
+  --any:#1FA85A;
+  --off:#E9EDF2;
+  --font:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Hiragino Sans",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-text-size-adjust:100%}
+button{font-family:var(--font);color:var(--ink);cursor:pointer;touch-action:manipulation}
+ruby rt{font-size:.5em;font-weight:400}
+[hidden]{display:none!important}
+
+/* 画面 */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column}
+
+/* スタート画面 */
+#start>*{flex-shrink:0}
+#start{overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:max(16px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+.topbar{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.tbtn{min-height:48px;min-width:48px;padding:6px 16px;border:2px solid var(--line);background:var(--panel);border-radius:12px;
+  font-size:17px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+.tbtn svg{width:24px;height:24px}
+.title{margin:8px 0 2px;font-size:clamp(34px,6vw,56px);font-weight:700;letter-spacing:.04em;line-height:1.25}
+.title .r{color:var(--right)}.title .l{color:var(--left)}
+.lead{margin:0 0 18px;font-size:clamp(17px,2.4vw,22px);color:var(--sub);line-height:1.9}
+.modes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.mode{min-height:96px;padding:12px 14px;border:3px solid var(--line);background:var(--panel);border-radius:16px;text-align:left;
+  display:flex;flex-direction:column;gap:6px;line-height:1.6}
+.mode b{font-size:22px}
+.mode span{font-size:14px;color:var(--sub)}
+.mode.sel{border-color:var(--main);box-shadow:0 0 0 3px rgba(18,144,106,.18)}
+.mode:disabled{background:var(--off);cursor:default}
+.mode:disabled b{color:#8A96A3}
+.mode .tag{align-self:flex-start;font-size:12px;padding:2px 8px;border-radius:99px;background:#fff;border:1px solid var(--line);color:#7A8794}
+.summary{font-size:16px;color:var(--sub);margin:0 0 16px;line-height:2}
+.summary b{color:var(--ink)}
+.go{align-self:center;min-height:88px;min-width:min(420px,100%);padding:10px 40px;border:none;border-radius:20px;background:var(--main);
+  color:var(--main-ink);font-size:clamp(30px,4.6vw,42px);font-weight:700;letter-spacing:.08em;box-shadow:0 6px 0 #0C6E50}
+.go:active{transform:translateY(4px);box-shadow:0 2px 0 #0C6E50}
+.note{margin-top:14px;font-size:14px;color:var(--sub);text-align:center;line-height:1.9}
+
+/* モーダル */
+.modal{position:fixed;inset:0;background:rgba(20,30,40,.45);display:flex;align-items:center;justify-content:center;z-index:50;
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.sheet{background:var(--panel);border-radius:18px;width:min(760px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:2px solid var(--line)}
+.sheet-h h2{margin:0;font-size:22px}
+.sheet-b{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 18px 18px}
+.close{min-width:96px;min-height:48px;border:none;border-radius:12px;background:var(--main);color:#fff;font-size:18px;font-weight:700}
+.grp{margin:16px 0 4px;font-size:15px;color:var(--sub);font-weight:700;letter-spacing:.1em;border-bottom:1px dashed var(--line);padding-bottom:4px}
+.row{display:flex;align-items:center;gap:10px 14px;padding:10px 0;flex-wrap:wrap;border-bottom:1px solid #EEF2F6}
+.row>label{flex:0 0 150px;font-size:17px;font-weight:700;line-height:1.9}
+.seg{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 300px}
+.seg button{min-height:48px;min-width:64px;padding:4px 14px;border:2px solid var(--line);background:#fff;border-radius:10px;font-size:17px;line-height:1.7}
+.seg button.on{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:52px;height:52px;border:2px solid var(--line);background:#fff;border-radius:10px;font-size:20px}
+.step input{width:84px;height:52px;border:2px solid var(--line);border-radius:10px;text-align:center;font-size:22px;font-family:var(--font);
+  font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text;background:#fff;color:var(--ink)}
+.step .unit{font-size:17px}
+.hint{flex:1 1 100%;font-size:14px;color:var(--sub);line-height:1.9;margin:0}
+.help ol{padding-left:1.4em;font-size:19px;line-height:2.2;margin:8px 0}
+.help .t{font-size:15px;color:var(--sub);line-height:1.9;border-top:1px solid var(--line);padding-top:10px}
+.privacy{margin-top:22px;padding:12px 14px;border-radius:12px;background:var(--off);font-size:15px;line-height:2;color:var(--ink)}
+.privacy b{display:block;font-size:16px}
+.chk{display:flex;align-items:center;gap:10px;font-size:16px;min-height:48px}
+.chk input{width:26px;height:26px}
+
+/* 活動画面 */
+#stage{background:#000}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#vid{position:absolute;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none;
+  padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left))}
+.pill{pointer-events:auto;background:rgba(255,255,255,.92);border-radius:14px;padding:6px 18px;font-size:clamp(22px,3.4vw,36px);font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.stop{pointer-events:auto;min-height:52px;min-width:88px;border:none;border-radius:14px;background:rgba(255,255,255,.92);font-size:20px;font-weight:700;
+  box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.hud .grow{flex:1}
+#msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,92vw);text-align:center;pointer-events:none}
+#msg .box{display:inline-block;background:rgba(255,255,255,.93);border-radius:22px;padding:18px 34px;box-shadow:0 4px 18px rgba(0,0,0,.2)}
+#msgMain{font-size:clamp(30px,5.4vw,58px);font-weight:700;line-height:1.5}
+#msgSub{font-size:clamp(18px,2.6vw,26px);color:var(--sub);line-height:1.9;margin-top:4px}
+#msgBar{margin:12px auto 2px;width:min(420px,70vw);height:18px;border-radius:9px;background:var(--off);overflow:hidden}
+#msgBar i{display:block;height:100%;width:0;background:var(--main)}
+#msg.big #msgMain{font-size:clamp(90px,16vw,180px);line-height:1.1}
+#msg.big .box{background:rgba(255,255,255,.85);padding:10px 60px}
+
+/* 結果 */
+#result{align-items:center;justify-content:center;background:var(--bg);overflow-y:auto;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.res{background:var(--panel);border-radius:22px;padding:24px 28px;width:min(640px,100%);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.08)}
+.res h2{margin:0;font-size:clamp(38px,6vw,56px)}
+.res .praise{font-size:22px;color:var(--sub);margin:4px 0 14px}
+.res .num{font-size:clamp(70px,12vw,120px);font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--main)}
+.res .lbl{font-size:22px;font-weight:700;line-height:2}
+.res .lr{display:flex;justify-content:center;gap:14px;margin:14px 0 20px;flex-wrap:wrap}
+.res .lr div{min-width:150px;padding:8px 14px;border-radius:14px;font-size:22px;font-weight:700;line-height:1.9;border:3px solid}
+.res .lr .r{border-color:var(--right);color:#B4560A}
+.res .lr .l{border-color:var(--left);color:#1E4FAE}
+.res .lr em{font-style:normal;font-size:34px;font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{min-height:64px;min-width:200px;padding:6px 22px;border-radius:16px;font-size:24px;font-weight:700;border:3px solid var(--line);background:#fff;line-height:1.7}
+.btn.main{background:var(--main);border-color:var(--main);color:#fff}
+
+/* 準備中・エラー */
+#wait{position:fixed;inset:0;z-index:60;background:rgba(243,246,249,.96);display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:24px max(20px,env(safe-area-inset-right)) 24px max(20px,env(safe-area-inset-left))}
+#wait .in{max-width:640px}
+#waitMain{font-size:clamp(26px,4.2vw,40px);font-weight:700;line-height:1.7}
+#waitSub{font-size:16px;color:var(--sub);line-height:2;margin:10px 0 18px}
+.spin{width:64px;height:64px;margin:0 auto 14px;border-radius:50%;border:8px solid var(--off);border-top-color:var(--main);animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+</style>
+</head>
+<body>
+
+<!-- ===== スタート画面 ===== -->
+<section id="start" class="screen">
+  <div class="topbar">
+    <button class="tbtn" id="btnFull" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      ぜんがめん</button>
+    <button class="tbtn" id="btnHelp">つかいかた</button>
+    <button class="tbtn" id="btnSet" aria-label="せってい">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      せってい</button>
+  </div>
+  <h1 class="title">からだで あそぼう</h1>
+  <p class="lead">カメラが<span style="color:var(--right);font-weight:700">みぎて</span>と<span style="color:var(--left);font-weight:700">ひだりて</span>を よみとるよ。<br>あそびを えらんで「はじめる」を おしてね。</p>
+  <div class="modes" id="modes"></div>
+  <p class="summary" id="summary"></p>
+  <button class="go" id="btnGo">はじめる</button>
+  <p class="note">iPadの<ruby>前<rt>まえ</rt></ruby>に<ruby>立<rt>た</rt></ruby>って、<ruby>体<rt>からだ</rt></ruby>ぜんたいが うつるように してね。</p>
+</section>
+
+<!-- ===== 活動画面 ===== -->
+<section id="stage" class="screen" hidden>
+  <video id="vid" playsinline muted autoplay></video>
+  <canvas id="cv"></canvas>
+  <div class="hud">
+    <button class="stop" id="btnStop">やめる</button>
+    <div class="pill" id="hudScore" hidden>タッチ 0</div>
+    <div class="grow"></div>
+    <div class="pill" id="hudTime" hidden>のこり 60秒</div>
+  </div>
+  <div id="msg" hidden><div class="box"><div id="msgMain"></div><div id="msgSub"></div><div id="msgBar" hidden><i></i></div></div></div>
+</section>
+
+<!-- ===== 結果画面 ===== -->
+<section id="result" class="screen" hidden>
+  <div class="res">
+    <h2>おわり！</h2>
+    <p class="praise">よく がんばったね</p>
+    <div class="lbl">タッチした<ruby>数<rt>かず</rt></ruby></div>
+    <div class="num" id="resNum">0</div>
+    <div class="lr">
+      <div class="r"><ruby>右手<rt>みぎて</rt></ruby><br><em id="resR">0</em></div>
+      <div class="l"><ruby>左手<rt>ひだりて</rt></ruby><br><em id="resL">0</em></div>
+    </div>
+    <div class="btns">
+      <button class="btn main" id="btnAgain">もういちど</button>
+      <button class="btn" id="btnHome">さいしょに もどる</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 設定 ===== -->
+<div class="modal" id="setModal" hidden>
+  <div class="sheet">
+    <div class="sheet-h"><h2>せってい</h2><button class="close" id="setClose">とじる</button></div>
+    <div class="sheet-b scroll" id="setBody"></div>
+  </div>
+</div>
+
+<!-- ===== つかいかた ===== -->
+<div class="modal" id="helpModal" hidden>
+  <div class="sheet help">
+    <div class="sheet-h"><h2>つかいかた</h2><button class="close" id="helpClose">とじる</button></div>
+    <div class="sheet-b scroll">
+      <ol>
+        <li>iPadを<ruby>大<rt>おお</rt></ruby>きな<ruby>画面<rt>がめん</rt></ruby>に つないで、<ruby>体<rt>からだ</rt></ruby>ぜんたいが うつるところに おいてね。</li>
+        <li>「はじめる」を おしたら、<ruby>両手<rt>りょうて</rt></ruby>を あげてね。あげた<ruby>人<rt>ひと</rt></ruby>を おぼえるよ。</li>
+        <li><ruby>光<rt>ひか</rt></ruby>っている<ruby>手<rt>て</rt></ruby>で、<ruby>出<rt>で</rt></ruby>てくる<ruby>的<rt>まと</rt></ruby>に タッチしてね。</li>
+        <li>とちゅうで うつらなくなったら、もういちど <ruby>両手<rt>りょうて</rt></ruby>を あげると つづきから はじまるよ。</li>
+      </ol>
+      <p class="t"><ruby>先生<rt>せんせい</rt></ruby>へ：iPadのSafariで<ruby>開<rt>ひら</rt></ruby>いてください。はじめての<ruby>時<rt>とき</rt></ruby>にカメラの<ruby>許可<rt>きょか</rt></ruby>を<ruby>聞<rt>き</rt></ruby>かれます。<ruby>画面<rt>がめん</rt></ruby>のはしは<ruby>読<rt>よ</rt></ruby>み<ruby>取<rt>と</rt></ruby>りが<ruby>弱<rt>よわ</rt></ruby>いので、<ruby>的<rt>まと</rt></ruby>は<ruby>少<rt>すこ</rt></ruby>し<ruby>内<rt>うち</rt></ruby>がわに<ruby>出<rt>で</rt></ruby>ます。<ruby>届<rt>とど</rt></ruby>く<ruby>範囲<rt>はんい</rt></ruby>は、カメラの<ruby>位置<rt>いち</rt></ruby>と<ruby>向<rt>む</rt></ruby>きで<ruby>合<rt>あ</rt></ruby>わせてください。</p>
+      <label class="chk"><input type="checkbox" id="helpNever"><span><ruby>次<rt>つぎ</rt></ruby>から<ruby>表示<rt>ひょうじ</rt></ruby>しない</span></label>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 準備中・エラー ===== -->
+<div id="wait" hidden>
+  <div class="in">
+    <div class="spin" id="waitSpin"></div>
+    <div id="waitMain">じゅんび しているよ</div>
+    <div id="waitSub"></div>
+    <button class="btn" id="waitBack" hidden>もどる</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 定数 ================= */
+const MP_VER = '1.1.1';
+const MP_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VER;
+const MODEL_URL = {
+  lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  full: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task'
+};
+const COL = { R:'#F07A18', L:'#2C6BDF', N:'#1FA85A' };
+const HAND_LM = { R:{w:16,i:20,p:18,s:12}, L:{w:15,i:19,p:17,s:11} };
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+const STORE_KEY = 'karadaAsobi_v1';
+const HELP_KEY = 'karadaAsobi_help_v1';
+
+/* ================= 設定 ================= */
+const DEF = {
+  mode:'touch', camera:'user', mirror:true, video:'full', model:'full',
+  time:60, hands:'both', lr:false, side:'any', area:'edge',
+  size:'m', shape:'circle', count:1, life:'normal', sound:true
+};
+let S = Object.assign({}, DEF);
+try{ const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if(s && typeof s === 'object') S = Object.assign({}, DEF, s); }catch(e){}
+function saveS(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+
+const R_ = (k,r)=>'<ruby>'+k+'<rt>'+r+'</rt></ruby>';
+
+const MODES = [
+  {id:'touch', name:'タッチ', desc:'あちこちに '+R_('出','で')+'る '+R_('的','まと')+'に タッチ', ok:true},
+  {id:'chase', name:'おいかけ', desc:R_('動','うご')+'く '+R_('的','まと')+'を おいかける'},
+  {id:'slash', name:'きる', desc:'とんでくる ものを きる'},
+  {id:'both', name:'りょうて', desc:'ふたつ '+R_('同時','どうじ')+'に タッチ'},
+  {id:'order', name:'じゅんばん', desc:R_('数字','すうじ')+'や もじを じゅんばんに'},
+  {id:'stop', name:'ストップ', desc:R_('合図','あいず')+'で ぴたっと とまる'},
+  {id:'sort', name:'なかまわけ', desc:'はこに はこんで わける'},
+  {id:'trace', name:'なぞり', desc:R_('大','おお')+'きな '+R_('形','かたち')+'を なぞる'}
+];
+
+const SCHEMA = [
+  {grp:'カメラ'},
+  {key:'camera', label:'カメラ', type:'seg', opts:[['user','インカメラ'],['environment',R_('背面','はいめん')+'カメラ']]},
+  {key:'mirror', label:R_('左右','さゆう')+R_('反転','はんてん'), type:'seg', opts:[[true,'あり（かがみ）'],[false,'なし']],
+    hint:'「あり」にすると、かがみのように '+R_('右手','みぎて')+'が '+R_('画面','がめん')+'の '+R_('右','みぎ')+'に うつるよ。ふつうは「あり」が わかりやすいよ。'},
+  {key:'video', label:R_('映像','えいぞう'), type:'seg', opts:[['full','こい'],['soft','うすい'],['none','なし']],
+    hint:'「なし」のときは '+R_('体','からだ')+'の '+R_('線','せん')+'だけ うすく '+R_('出','で')+'るよ。'},
+  {key:'model', label:R_('読','よ')+'み'+R_('取','と')+'り', type:'seg', opts:[['full','せいかく'],['lite','はやい']],
+    hint:'うごきが おそく '+R_('感','かん')+'じるときは「はやい」に してね。'},
+  {grp:'タッチ'},
+  {key:'time', label:R_('時間','じかん'), type:'step', min:10, max:300, step:10, unit:'秒'},
+  {key:'hands', label:R_('使','つか')+'う'+R_('手','て'), type:'seg', opts:[['both',R_('両手','りょうて')],['R',R_('右手','みぎて')+'だけ'],['L',R_('左手','ひだりて')+'だけ']]},
+  {key:'lr', label:R_('左右','さゆう')+'の'+R_('指定','してい'), type:'seg', opts:[[false,'なし'],[true,'あり']], show:()=>S.hands==='both',
+    hint:'「あり」にすると、'+R_('的','まと')+'に '+R_('手','て')+'と '+R_('同','おな')+'じ '+R_('色','いろ')+'と「みぎ」「ひだり」が つくよ。'},
+  {key:'side', label:R_('的','まと')+'の'+R_('場所','ばしょ'), type:'seg', opts:[['any','どこでも'],['same',R_('同','おな')+'じがわ'],['opp',R_('反対','はんたい')+'がわ']],
+    show:()=>S.hands!=='both' || S.lr,
+    hint:R_('同','おな')+'じがわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('体','からだ')+'の '+R_('右','みぎ')+'がわに '+R_('出','で')+'るよ。'+R_('反対','はんたい')+'がわ：'+R_('右手','みぎて')+'の '+R_('的','まと')+'が '+R_('左','ひだり')+'がわに '+R_('出','で')+'るよ（'+R_('体','からだ')+'の まんなかを こえる うごき）。'},
+  {key:'area', label:R_('出','で')+'るところ', type:'seg', opts:[['edge','はしっこ'+R_('多','おお')+'め'],['all',R_('画面','がめん')+'ぜんたい']]},
+  {key:'size', label:R_('的','まと')+'の'+R_('大','おお')+'きさ', type:'seg', opts:[['s',R_('小','しょう')],['m',R_('中','ちゅう')],['l',R_('大','だい')]]},
+  {key:'shape', label:R_('的','まと')+'の'+R_('形','かたち'), type:'seg', opts:[['circle','まる'],['star','ほし'],['heart','ハート']]},
+  {key:'count', label:'いちどに'+R_('出','で')+'る'+R_('数','かず'), type:'step', min:1, max:4, step:1, unit:'こ'},
+  {key:'life', label:R_('消','き')+'えるまで', type:'seg', opts:[['none',R_('消','き')+'えない'],['slow','ゆっくり'],['normal','ふつう'],['fast','はやい']]},
+  {grp:'その'+R_('他','ほか')},
+  {key:'sound', label:R_('効果音','こうかおん'), type:'seg', opts:[[true,'あり'],[false,'なし']]}
+];
+
+/* ================= DOM ================= */
+const $ = id => document.getElementById(id);
+const scrStart=$('start'), scrStage=$('stage'), scrResult=$('result');
+const cv=$('cv'), ctx=cv.getContext('2d'), video=$('vid');
+const msgEl=$('msg'), msgMain=$('msgMain'), msgSub=$('msgSub'), msgBar=$('msgBar'), msgBarI=msgBar.querySelector('i');
+const hudScore=$('hudScore'), hudTime=$('hudTime');
+
+/* ================= iPadの標準動作をおさえる ================= */
+document.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+document.addEventListener('gesturechange', e=>e.preventDefault(), {passive:false});
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e=>{
+  const now = Date.now();
+  const interactive = e.target.closest && e.target.closest('button,input,label,a,select');
+  if(!interactive && now - lastTouchEnd < 300) e.preventDefault();
+  lastTouchEnd = now;
+}, {passive:false});
+document.addEventListener('touchmove', e=>{
+  if(e.touches.length > 1){ e.preventDefault(); return; }
+  if(!(e.target.closest && e.target.closest('.scroll,#start,#result'))) e.preventDefault();
+}, {passive:false});
+document.addEventListener('contextmenu', e=>e.preventDefault());
+
+/* ================= 画面切り替え ================= */
+function show(scr){
+  [scrStart,scrStage,scrResult].forEach(s=>{ s.hidden = (s!==scr); });
+}
+
+/* ================= スタート画面 ================= */
+function renderModes(){
+  const box = $('modes'); box.innerHTML='';
+  MODES.forEach(m=>{
+    const b = document.createElement('button');
+    b.className = 'mode' + (S.mode===m.id ? ' sel':'');
+    b.innerHTML = '<b>'+m.name+'</b><span>'+m.desc+'</span>' + (m.ok ? '' : '<span class="tag">じゅんびちゅう</span>');
+    b.disabled = !m.ok;
+    b.addEventListener('click', ()=>{ S.mode=m.id; saveS(); renderModes(); });
+    box.appendChild(b);
+  });
+}
+function renderSummary(){
+  const parts = [];
+  parts.push('<b>'+S.time+'秒</b>');
+  parts.push(S.hands==='both' ? R_('両手','りょうて') : S.hands==='R' ? R_('右手','みぎて')+'だけ' : R_('左手','ひだりて')+'だけ');
+  if(S.hands==='both') parts.push(R_('左右','さゆう')+'の'+R_('指定','してい')+(S.lr?'あり':'なし'));
+  if(S.hands!=='both' || S.lr) parts.push(S.side==='any'?'どこでも':S.side==='same'?R_('同','おな')+'じがわ':R_('反対','はんたい')+'がわ');
+  parts.push(S.camera==='user'?'インカメラ':R_('背面','はいめん')+'カメラ');
+  $('summary').innerHTML = 'いまの せってい： ' + parts.join(' ・ ');
+}
+
+/* ================= 設定パネル ================= */
+function renderSettings(){
+  const body = $('setBody'); body.innerHTML='';
+  SCHEMA.forEach(it=>{
+    if(it.grp){ const g=document.createElement('div'); g.className='grp'; g.innerHTML=it.grp; body.appendChild(g); return; }
+    if(it.show && !it.show()) return;
+    const row = document.createElement('div'); row.className='row';
+    const lab = document.createElement('label'); lab.innerHTML = it.label; row.appendChild(lab);
+    if(it.type==='seg'){
+      const seg = document.createElement('div'); seg.className='seg';
+      it.opts.forEach(([v,t])=>{
+        const b=document.createElement('button'); b.innerHTML=t;
+        if(S[it.key]===v) b.className='on';
+        b.addEventListener('click', ()=>{ S[it.key]=v; saveS(); renderSettings(); renderSummary(); });
+        seg.appendChild(b);
+      });
+      row.appendChild(seg);
+    }else{
+      const st=document.createElement('div'); st.className='step';
+      const dn=document.createElement('button'); dn.textContent='▽'; dn.setAttribute('aria-label','へらす');
+      const inp=document.createElement('input'); inp.type='number'; inp.inputMode='numeric'; inp.value=S[it.key]; inp.id='in_'+it.key;
+      const up=document.createElement('button'); up.textContent='△'; up.setAttribute('aria-label','ふやす');
+      const un=document.createElement('span'); un.className='unit'; un.textContent=it.unit||'';
+      const setV = v=>{ v=Math.round(Number(v)/it.step)*it.step; if(!isFinite(v)) v=S[it.key];
+        v=Math.max(it.min,Math.min(it.max,v)); S[it.key]=v; inp.value=v; saveS(); renderSummary(); };
+      dn.addEventListener('click', ()=>setV(S[it.key]-it.step));
+      up.addEventListener('click', ()=>setV(S[it.key]+it.step));
+      inp.addEventListener('change', ()=>setV(inp.value));
+      inp.addEventListener('blur', ()=>setV(inp.value));
+      st.append(dn,inp,up,un); row.appendChild(st);
+    }
+    if(it.hint){ const h=document.createElement('p'); h.className='hint'; h.innerHTML=it.hint; row.appendChild(h); }
+    body.appendChild(row);
+  });
+  const pv=document.createElement('div'); pv.className='privacy';
+  pv.innerHTML='<b>カメラの'+R_('映像','えいぞう')+'について</b>'+
+    'カメラの'+R_('映像','えいぞう')+'は、このiPadの'+R_('中','なか')+'だけで'+R_('読','よ')+'み'+R_('取','と')+'りに'+R_('使','つか')+'います。'+
+    R_('映像','えいぞう')+'や'+R_('写真','しゃしん')+'を、ほかの'+R_('場所','ばしょ')+'へ'+R_('送信','そうしん')+'したり、'+R_('保存','ほぞん')+'したりすることはありません。<br>'+
+    'このiPadに'+R_('保存','ほぞん')+'するのは、この「せってい」の'+R_('内容','ないよう')+'だけです。<br>'+
+    R_('最初','さいしょ')+'に、'+R_('読','よ')+'み'+R_('取','と')+'りのしくみ（プログラムとデータ）をインターネットから'+R_('読','よ')+'みこみます。';
+  body.appendChild(pv);
+}
+$('btnSet').addEventListener('click', ()=>{ renderSettings(); $('setModal').hidden=false; });
+$('setClose').addEventListener('click', ()=>{ $('setModal').hidden=true; });
+$('btnHelp').addEventListener('click', ()=>{ $('helpModal').hidden=false; });
+$('helpClose').addEventListener('click', ()=>{
+  if($('helpNever').checked){ try{ localStorage.setItem(HELP_KEY,'1'); }catch(e){} }
+  $('helpModal').hidden=true;
+});
+
+/* 全画面（使える環境だけボタンを出す） */
+(function(){
+  const el=document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if(!req) return;
+  const b=$('btnFull'); b.hidden=false;
+  b.addEventListener('click', ()=>{
+    try{
+      const fs = document.fullscreenElement || document.webkitFullscreenElement;
+      if(fs){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }
+      else { const p=req.call(el); if(p && p.catch) p.catch(()=>{}); }
+    }catch(e){}
+  });
+})();
+
+/* ================= 効果音 ================= */
+let actx = null;
+function unlockAudio(){
+  try{
+    if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; if(AC) actx = new AC(); }
+    if(!actx) return;
+    if(actx.state==='suspended') actx.resume();
+    const b = actx.createBuffer(1,1,22050), s = actx.createBufferSource();
+    s.buffer=b; s.connect(actx.destination); s.start(0);
+  }catch(e){}
+}
+function tone(f, dur, type, vol, when){
+  if(!S.sound || !actx) return;
+  try{
+    const t = actx.currentTime + (when||0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||'sine'; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.2, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+0.03);
+  }catch(e){}
+}
+const SFX = {
+  hit(){ tone(880,.12,'triangle',.22); tone(1320,.2,'triangle',.18,.06); },
+  wrong(){ tone(392,.16,'sine',.09); },
+  tick(){ tone(660,.14,'sine',.18); },
+  go(){ tone(988,.3,'triangle',.22); },
+  reg(){ tone(523,.12,'triangle',.18); tone(659,.12,'triangle',.18,.1); tone(784,.22,'triangle',.18,.2); },
+  lost(){ tone(440,.2,'sine',.1); tone(349,.25,'sine',.1,.18); },
+  end(){ [523,659,784,1047].forEach((f,i)=>tone(f,.24,'triangle',.2,i*.13)); }
+};
+
+/* ================= 画面スリープ防止 ================= */
+let wakeLock = null;
+async function keepAwake(on){
+  try{
+    if(on && 'wakeLock' in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ wakeLock=null; }); }
+    if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; }
+  }catch(e){ wakeLock=null; }
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !scrStage.hidden) keepAwake(true); });
+
+/* ================= 準備中・エラー表示 ================= */
+function waitShow(main, sub, isErr){
+  $('wait').hidden=false; $('waitMain').innerHTML=main; $('waitSub').innerHTML=sub||'';
+  $('waitSpin').hidden=!!isErr; $('waitBack').hidden=!isErr;
+}
+function waitHide(){ $('wait').hidden=true; }
+$('waitBack').addEventListener('click', ()=>{ waitHide(); goHome(); });
+
+/* ================= カメラ ================= */
+let stream = null, streamFacing = null;
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+  stream=null; streamFacing=null; video.srcObject=null;
+}
+async function startCamera(){
+  if(stream && streamFacing===S.camera && stream.getVideoTracks().some(t=>t.readyState==='live')) return;
+  stopCamera();
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio:false,
+    video:{ facingMode:{ideal:S.camera}, width:{ideal:1280}, height:{ideal:720} }
+  });
+  streamFacing = S.camera;
+  video.srcObject = stream;
+  await new Promise(res=>{ if(video.readyState>=1) res(); else video.onloadedmetadata=()=>res(); });
+  try{ await video.play(); }catch(e){}
+}
+
+/* ================= 読み取り（MediaPipe Pose） ================= */
+let TV = null, fileset = null, landmarker = null, landmarkerModel = null;
+async function loadModel(){
+  if(landmarker && landmarkerModel===S.model) return;
+  if(!TV){ TV = await import(MP_CDN + '/vision_bundle.mjs'); }
+  if(!fileset){ fileset = await TV.FilesetResolver.forVisionTasks(MP_CDN + '/wasm'); }
+  if(landmarker){ try{ landmarker.close(); }catch(e){} landmarker=null; }
+  const opts = d=>({
+    baseOptions:{ modelAssetPath:MODEL_URL[S.model], delegate:d },
+    runningMode:'VIDEO', numPoses:3,
+    minPoseDetectionConfidence:0.5, minPosePresenceConfidence:0.5, minTrackingConfidence:0.5
+  });
+  try{ landmarker = await TV.PoseLandmarker.createFromOptions(fileset, opts('GPU')); }
+  catch(e){ landmarker = await TV.PoseLandmarker.createFromOptions(fileset, opts('CPU')); }
+  landmarkerModel = S.model;
+}
+
+/* ================= 画面サイズと座標の変換 ================= */
+let W=0, H=0, DPR=1, MIN=1, HUDH=70;
+const L = {ox:0, oy:0, dw:1, dh:1};
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth || window.innerWidth; H = cv.clientHeight || window.innerHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  MIN = Math.min(W,H);
+  HUDH = Math.max(64, Math.min(96, MIN*0.11));
+  layoutVideo();
+}
+function layoutVideo(){
+  const vw = video.videoWidth||16, vh = video.videoHeight||9;
+  const s = Math.max(W/vw, H/vh);
+  L.dw = vw*s; L.dh = vh*s; L.ox = (W-L.dw)/2; L.oy = (H-L.dh)/2;
+}
+window.addEventListener('resize', ()=>{ if(!scrStage.hidden) resize(); });
+window.addEventListener('orientationchange', ()=>setTimeout(()=>{ if(!scrStage.hidden) resize(); }, 300));
+function toScr(p){
+  return { x: L.ox + (S.mirror ? (1-p.x) : p.x) * L.dw, y: L.oy + p.y * L.dh };
+}
+
+/* ================= 手の位置のなめらかさ（One Euro フィルター） ================= */
+function LowPass(){ this.y=null; }
+LowPass.prototype.f = function(x,a){ this.y = (this.y===null) ? x : a*x + (1-a)*this.y; return this.y; };
+function OneEuro(minCut, beta){ this.minCut=minCut; this.beta=beta; this.x=new LowPass(); this.dx=new LowPass(); this.prev=null; }
+OneEuro.prototype.alpha = function(cut, dt){ const tau=1/(2*Math.PI*cut); return 1/(1+tau/dt); };
+OneEuro.prototype.filter = function(v, dt){
+  if(this.prev===null){ this.prev=v; this.dx.y=0; return this.x.f(v,1); }
+  dt = Math.max(dt, 1/240);
+  const d = (v-this.prev)/dt; this.prev=v;
+  const ed = this.dx.f(d, this.alpha(1.0, dt));
+  return this.x.f(v, this.alpha(this.minCut + this.beta*Math.abs(ed), dt));
+};
+OneEuro.prototype.reset = function(){ this.x=new LowPass(); this.dx=new LowPass(); this.prev=null; };
+
+function makeHand(id){
+  return { id, seen:false, tx:0, ty:0, x:0, y:0, px:0, py:0, a:0, lastSeen:0, trail:[],
+    fx:new OneEuro(1.2, 0.012), fy:new OneEuro(1.2, 0.012), init:false, speed:0 };
+}
+const HANDS = { R:makeHand('R'), L:makeHand('L') };
+
+/* ================= 人の登録と追跡 ================= */
+let person = null;           // {cx, cy, sw, lm, lastSeen}
+let poses = [];              // 最新の読み取り結果（全員分）
+let regCand = null;          // {cx, cy, t}
+const REG_TIME = 2.0;        // 両手を上げてキープする秒数
+const LOST_MS = 1500;
+
+function bodyOf(lm){
+  const ls = lm[11], rs = lm[12];
+  if(!ls || !rs) return null;
+  const a = toScr(ls), b = toScr(rs);
+  let cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
+  const lh=lm[23], rh=lm[24];
+  if(lh && rh && lh.visibility>0.5 && rh.visibility>0.5){
+    const c=toScr(lh), d=toScr(rh); cx=(cx+(c.x+d.x)/2)/2; cy=(cy+(c.y+d.y)/2)/2;
+  }
+  return { cx, cy, sw: Math.hypot(a.x-b.x, a.y-b.y), lsx:a.x, rsx:b.x };
+}
+function handsUp(lm){
+  const lw=lm[15], rw=lm[16], ls=lm[11], rs=lm[12];
+  if(!lw||!rw||!ls||!rs) return false;
+  if(lw.visibility<0.5 || rw.visibility<0.5) return false;
+  return lw.y < ls.y - 0.02 && rw.y < rs.y - 0.02;
+}
+function matchPerson(){
+  if(!person) return null;
+  let best=null, bd=1e9;
+  for(const lm of poses){
+    const b = bodyOf(lm); if(!b) continue;
+    const d = Math.hypot(b.cx-person.cx, b.cy-person.cy);
+    if(d<bd){ bd=d; best={lm,b}; }
+  }
+  const lim = Math.max(MIN*0.2, person.sw*1.6);
+  return (best && bd<lim) ? best : null;
+}
+
+/* ================= ゲームの状態 ================= */
+let phase = 'off';           // off / register / countdown / play / end
+let resumeAfterReg = false;
+let cdT = 0, cdShown = -1, regMsgT = 0;
+let remain = 0, score = 0, byHand = {R:0,L:0};
+let targets = [], particles = [], floats = [];
+let spawnT = 0, lastHandAssign = [], gameStarted = false;
+let raf = 0, lastNow = 0, lastVT = -1, lastTs = 0;
+
+function setMsg(main, sub, opt){
+  opt = opt||{};
+  if(main===null){ msgEl.hidden=true; return; }
+  msgEl.hidden=false; msgEl.className = opt.big ? 'big' : '';
+  msgMain.innerHTML = main; msgSub.innerHTML = sub||''; msgSub.hidden = !sub;
+  msgBar.hidden = !opt.bar;
+}
+
+/* ================= 開始・終了 ================= */
+$('btnGo').addEventListener('click', ()=>{
+  // iPadで音を出すため、await より前に音声を解錠する
+  unlockAudio();
+  startStage();
+});
+
+async function startStage(){
+  if(!window.isSecureContext){
+    waitShow('このページは https で ひらいてね', 'カメラは https のページでしか つかえません。', true); return;
+  }
+  waitShow('じゅんび しているよ', 'カメラを じゅんびしているよ');
+  try{
+    await startCamera();
+  }catch(e){
+    stopCamera();
+    waitShow('カメラが つかえなかったよ',
+      'iPadの「'+R_('設定','せってい')+'」→「Safari」→「カメラ」を「'+R_('許可','きょか')+'」にして、もういちど ためしてね。<br>（ほかのアプリでカメラを つかっていないかも たしかめてね）', true);
+    return;
+  }
+  try{
+    $('waitSub').innerHTML = R_('読','よ')+'み'+R_('取','と')+'りの じゅんびを しているよ（はじめては すこし じかんが かかるよ）';
+    await loadModel();
+  }catch(e){
+    waitShow(R_('読','よ')+'み'+R_('取','と')+'りの じゅんびが できなかったよ',
+      'インターネットに つながっているか たしかめて、もういちど ためしてね。', true);
+    return;
+  }
+  waitHide();
+  show(scrStage);
+  resize();
+  keepAwake(true);
+  newGame();
+  person = null; regCand = null;
+  enterRegister(false);
+  lastNow = performance.now();
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+}
+
+function newGame(){
+  remain = S.time; score = 0; byHand = {R:0,L:0};
+  targets = []; particles = []; floats = []; spawnT = 0; lastHandAssign = [];
+  gameStarted = false;
+  hudScore.hidden = true; hudTime.hidden = true;
+  updateHud();
+}
+function enterRegister(lost){
+  phase = 'register'; regCand = null; resumeAfterReg = gameStarted && remain>0;
+  if(lost){
+    setMsg('すがたが みえなくなったよ', R_('両手','りょうて')+'を あげると つづきから はじまるよ', {bar:true});
+  }else{
+    setMsg(R_('両手','りょうて')+'を あげてね', 'あげた '+R_('人','ひと')+'を おぼえるよ', {bar:true});
+  }
+  msgBarI.style.width='0%';
+}
+function enterCountdown(){
+  phase = 'countdown'; cdT = 3.99; cdShown = -1; regMsgT = 0.9;
+  setMsg('おぼえたよ！', null);
+}
+function enterPlay(){
+  phase = 'play'; gameStarted = true;
+  hudScore.hidden=false; hudTime.hidden=false;
+  setMsg('スタート！', null, {big:true});
+  setTimeout(()=>{ if(phase==='play') setMsg(null); }, 700);
+  SFX.go();
+}
+function endGame(){
+  phase = 'end'; cancelAnimationFrame(raf); raf=0;
+  SFX.end(); keepAwake(false);
+  $('resNum').textContent = score; $('resR').textContent = byHand.R; $('resL').textContent = byHand.L;
+  setMsg(null);
+  show(scrResult);
+}
+function goHome(){
+  phase='off'; cancelAnimationFrame(raf); raf=0; keepAwake(false);
+  setMsg(null);
+  renderModes(); renderSummary();
+  show(scrStart);
+}
+$('btnStop').addEventListener('click', ()=>{ if(gameStarted) endGame(); else { goHome(); } });
+$('btnAgain').addEventListener('click', ()=>{
+  unlockAudio();
+  show(scrStage); resize(); keepAwake(true);
+  newGame();
+  // 前の人をそのまま使う。うつっていなければ少しあとに登録の画面になる
+  if(person){ person.lastSeen = performance.now(); enterCountdown(); setMsg('もういちど いくよ', null); }
+  else { enterRegister(false); }
+  lastNow = performance.now(); cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+});
+$('btnHome').addEventListener('click', goHome);
+
+function updateHud(){
+  hudScore.textContent = 'タッチ ' + score;
+  hudTime.textContent = 'のこり ' + Math.max(0, Math.ceil(remain)) + '秒';
+}
+
+/* ================= 読み取りの実行 ================= */
+function detect(now){
+  if(!landmarker || video.readyState<2) return false;
+  if(video.currentTime===lastVT) return false;
+  lastVT = video.currentTime;
+  let ts = now; if(ts<=lastTs) ts = lastTs + 1; lastTs = ts;
+  let res;
+  try{ res = landmarker.detectForVideo(video, ts); }catch(e){ return false; }
+  poses = (res && res.landmarks) ? res.landmarks : [];
+  return true;
+}
+
+function handPoint(lm, h){
+  const ix = HAND_LM[h];
+  const w = lm[ix.w], i = lm[ix.i], p = lm[ix.p];
+  if(!w || w.visibility < 0.35) return null;
+  let x=w.x, y=w.y;
+  if(i && p){ const mx=(i.x+p.x)/2, my=(i.y+p.y)/2; x = w.x + (mx-w.x)*1.25; y = w.y + (my-w.y)*1.25; }
+  if(x < -0.05 || x > 1.05 || y < -0.05 || y > 1.05) return null;
+  return toScr({x,y});
+}
+
+let lastDetNow = 0;
+function onDetection(now){
+  const dt = Math.min(0.1, Math.max(1/120, (now - (lastDetNow||now-33))/1000)); lastDetNow = now;
+
+  if(phase==='register'){
+    // 両手を上げている人を探す
+    let cand = null, cb = null;
+    for(const lm of poses){
+      if(!handsUp(lm)) continue;
+      const b = bodyOf(lm); if(!b) continue;
+      if(regCand){
+        const d = Math.hypot(b.cx-regCand.cx, b.cy-regCand.cy);
+        if(!cand || d < cb.d){ cand=lm; cb={b,d}; }
+      }else if(!cand){ cand=lm; cb={b,d:0}; }
+    }
+    if(cand){
+      const lim = Math.max(MIN*0.2, cb.b.sw*1.6);
+      if(regCand && cb.d < lim){ regCand.t += dt; regCand.cx=cb.b.cx; regCand.cy=cb.b.cy; regCand.lm=cand; }
+      else { regCand = {cx:cb.b.cx, cy:cb.b.cy, t:0, lm:cand}; }
+      if(regCand.t >= REG_TIME){
+        person = {cx:regCand.cx, cy:regCand.cy, sw:cb.b.sw, lm:cand, lastSeen:now};
+        regCand = null; SFX.reg();
+        enterCountdown();
+      }
+    }else if(regCand){
+      regCand.t -= dt*2;
+      if(regCand.t <= 0) regCand = null;
+    }
+    msgBarI.style.width = (regCand ? Math.min(100, regCand.t/REG_TIME*100) : 0) + '%';
+  }
+
+  // 登録した人を追いかける
+  let m = null;
+  if(person && phase!=='register'){
+    m = matchPerson();
+    if(m){
+      person.cx = person.cx*0.4 + m.b.cx*0.6; person.cy = person.cy*0.4 + m.b.cy*0.6;
+      person.sw = person.sw*0.8 + m.b.sw*0.2; person.lm = m.lm; person.lastSeen = now;
+      person.lsx = m.b.lsx; person.rsx = m.b.rsx;
+    }
+  }
+  // 手の位置
+  for(const h of ['R','L']){
+    const hd = HANDS[h];
+    const p = m ? handPoint(m.lm, h) : null;
+    if(p){
+      if(!hd.seen || now - hd.lastSeen > 400){ hd.fx.reset(); hd.fy.reset(); }
+      hd.tx = hd.fx.filter(p.x, dt); hd.ty = hd.fy.filter(p.y, dt);
+      if(!hd.init){ hd.x=hd.tx; hd.y=hd.ty; hd.px=hd.x; hd.py=hd.y; hd.init=true; }
+      if(!hd.seen){ hd.x=hd.tx; hd.y=hd.ty; hd.px=hd.x; hd.py=hd.y; hd.trail.length=0; }
+      hd.seen = true; hd.lastSeen = now;
+    }else if(now - hd.lastSeen > 250){
+      hd.seen = false;
+    }
+  }
+}
+
+/* ================= メインループ ================= */
+function loop(now){
+  raf = requestAnimationFrame(loop);
+  let dt = (now - lastNow)/1000; lastNow = now;
+  if(!(dt>0)) dt = 1/60;
+  dt = Math.min(dt, 1/30);              // 120Hzでも速さが変わらないようにクランプ
+  const k = dt*60;                       // dtScale
+
+  if(video.videoWidth && (Math.abs(L.dw/L.dh - video.videoWidth/video.videoHeight) > 0.01)) layoutVideo();
+
+  if(detect(now)) onDetection(now);
+
+  // 見失ったら一時停止
+  if((phase==='play' || phase==='countdown') && person && now - person.lastSeen > LOST_MS){
+    SFX.lost(); enterRegister(true);
+  }
+
+  // 手の表示位置（読み取りの間をなめらかにつなぐ）
+  for(const h of ['R','L']){
+    const hd = HANDS[h];
+    hd.px = hd.x; hd.py = hd.y;
+    if(hd.seen){
+      const f = 1 - Math.exp(-dt*28);
+      hd.x += (hd.tx-hd.x)*f; hd.y += (hd.ty-hd.y)*f;
+      hd.a = Math.min(1, hd.a + dt*6);
+      hd.trail.push({x:hd.x, y:hd.y, t:now});
+      hd.speed = Math.hypot(hd.x-hd.px, hd.y-hd.py)/dt;
+      if(hd.speed > MIN*1.2 && Math.random() < 0.5*k) spark(hd.x, hd.y, COL[h], 1, 0.6);
+    }else{
+      hd.a = Math.max(0, hd.a - dt*4);
+      hd.speed = 0;
+    }
+    while(hd.trail.length && now - hd.trail[0].t > 320) hd.trail.shift();
+    if(!hd.seen && hd.trail.length) hd.trail.shift();
+  }
+
+  if(phase==='countdown'){
+    if(regMsgT > 0){ regMsgT -= dt; }
+    else{
+      cdT -= dt;
+      const n = Math.ceil(cdT - 0.99);
+      if(n !== cdShown && n >= 1){ cdShown = n; setMsg(String(n), null, {big:true}); SFX.tick(); }
+      if(cdT <= 1){ enterPlay(); if(!targets.length) spawnT = 0; }
+    }
+  }
+
+  if(phase==='play'){
+    remain -= dt;
+    updateTouch(dt, now);
+    if(remain <= 0){ remain = 0; updateHud(); endGame(); return; }
+    updateHud();
+  }
+
+  updateFx(dt, k);
+  draw(now);
+}
+
+/* ================= タッチモード ================= */
+const SIZE_R = { s:0.06, m:0.082, l:0.108 };
+const LIFE = { none:Infinity, slow:7, normal:4.5, fast:2.8 };
+
+function handR(){ return MIN*0.045; }
+
+function nextHand(){
+  if(S.hands==='R') return 'R';
+  if(S.hands==='L') return 'L';
+  if(!S.lr) return null;
+  let h = Math.random()<0.5 ? 'R' : 'L';
+  const n = lastHandAssign.length;
+  if(n>=2 && lastHandAssign[n-1]===h && lastHandAssign[n-2]===h) h = (h==='R'?'L':'R');
+  lastHandAssign.push(h); if(lastHandAssign.length>4) lastHandAssign.shift();
+  return h;
+}
+
+// 体の「右がわ」が画面のどちら向きか（+1 なら画面の右）
+function bodyRightDir(){
+  if(person && person.rsx!==undefined && person.lsx!==undefined && Math.abs(person.rsx-person.lsx) > 4)
+    return person.rsx > person.lsx ? 1 : -1;
+  return S.mirror ? 1 : -1;
+}
+
+function candidatePos(r, edgePref){
+  const m = r + MIN*0.035;
+  const x0 = m, x1 = W - m, y0 = HUDH + r + 6, y1 = H - m;
+  if(x1<=x0 || y1<=y0) return {x:W/2, y:H/2};
+  if(!edgePref) return { x: x0 + Math.random()*(x1-x0), y: y0 + Math.random()*(y1-y0) };
+  const bw = Math.max(r*1.2, (x1-x0)*0.2), bh = Math.max(r*1.2, (y1-y0)*0.22);
+  const u = Math.random();
+  if(u < 0.34) return { x: x0 + Math.random()*(x1-x0), y: y0 + Math.random()*bh };            // 上
+  if(u < 0.62) return { x: x0 + Math.random()*bw, y: y0 + Math.random()*(y1-y0) };            // 左
+  if(u < 0.90) return { x: x1 - Math.random()*bw, y: y0 + Math.random()*(y1-y0) };            // 右
+  return { x: x0 + Math.random()*(x1-x0), y: y1 - Math.random()*bh };                          // 下
+}
+
+function spawnTarget(){
+  const r = MIN * SIZE_R[S.size];
+  const hand = nextHand();
+  const cx = person ? person.cx : W/2;
+  let sideDir = 0;
+  if(hand && S.side!=='any'){
+    const rd = bodyRightDir();
+    const same = (hand==='R') ? rd : -rd;
+    sideDir = S.side==='same' ? same : -same;
+  }
+  const off = Math.max(MIN*0.08, (person?person.sw:MIN*0.2)*0.5);
+  let pos = null;
+  for(let pass=0; pass<3 && !pos; pass++){
+    for(let i=0; i<50; i++){
+      const p = candidatePos(r, pass<2 && S.area==='edge');
+      if(sideDir && (p.x - cx)*sideDir < (pass<2 ? off : r*0.3)) continue;
+      let ok = true;
+      for(const t of targets){ if(t.state!=='out' && Math.hypot(t.x-p.x, t.y-p.y) < (t.r + r)*1.3){ ok=false; break; } }
+      if(ok && pass<2){
+        for(const h of ['R','L']){ const hd=HANDS[h]; if(hd.seen && Math.hypot(hd.x-p.x, hd.y-p.y) < r + handR()*3){ ok=false; break; } }
+      }
+      if(ok){ pos=p; break; }
+    }
+  }
+  if(!pos){
+    // どうしても置けないときは、体の指定がわの はしに置く
+    pos = { x: sideDir ? (sideDir>0 ? W - r - MIN*0.04 : r + MIN*0.04) : W/2, y: HUDH + r + (H-HUDH-2*r)*Math.random() };
+  }
+  targets.push({ x:pos.x, y:pos.y, r, hand, age:0, life:LIFE[S.life], state:'in', outT:0, wrongCd:0, spin:Math.random()*Math.PI*2 });
+}
+
+function segDist(px,py, ax,ay, bx,by){
+  const vx=bx-ax, vy=by-ay, l2=vx*vx+vy*vy;
+  let t = l2>0 ? ((px-ax)*vx + (py-ay)*vy)/l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px-(ax+vx*t), py-(ay+vy*t));
+}
+
+function updateTouch(dt, now){
+  const live = targets.filter(t=>t.state==='in'||t.state==='live').length;
+  if(live < S.count){
+    spawnT -= dt;
+    if(spawnT <= 0){ spawnTarget(); spawnT = 0.35; }
+  }
+  const hr = handR();
+  for(const t of targets){
+    if(t.state==='out'){ t.outT += dt; continue; }
+    t.age += dt; t.wrongCd = Math.max(0, t.wrongCd - dt);
+    if(t.state==='in' && t.age > 0.28) t.state='live';
+    if(t.age > t.life){ t.state='out'; t.outT=0; continue; }
+    if(t.age < 0.12) continue;
+    for(const h of ['R','L']){
+      const hd = HANDS[h];
+      if(!hd.seen || hd.a < 0.5) continue;
+      const d = segDist(t.x, t.y, hd.px, hd.py, hd.x, hd.y);
+      if(d > t.r + hr*0.6) continue;
+      if(!t.hand || t.hand===h){
+        t.state='hit'; score++; byHand[h]++;
+        burst(t.x, t.y, t.hand ? COL[t.hand] : COL.N, t.r);
+        floats.push({x:t.x, y:t.y - t.r*0.2, text:'タッチ！', color:'#1E2833', t:0, max:0.8, size:Math.max(26, t.r*0.55)});
+        SFX.hit();
+        spawnT = Math.min(spawnT, 0.35);
+        break;
+      }else if(t.wrongCd<=0){
+        t.wrongCd = 1.4;
+        const need = t.hand==='R' ? 'みぎて' : 'ひだりて';
+        floats.push({x:t.x, y:t.y - t.r - 24, text:need+'で さわってね', color:COL[t.hand], t:0, max:1.4, size:Math.max(24, MIN*0.04)});
+        SFX.wrong();
+      }
+    }
+  }
+  targets = targets.filter(t=> t.state!=='hit' && !(t.state==='out' && t.outT>0.35));
+}
+
+/* ================= エフェクト ================= */
+function burst(x,y,color,r){
+  const n = 22;
+  for(let i=0;i<n;i++){
+    const a = Math.PI*2*i/n + Math.random()*0.3, sp = (2.5+Math.random()*4.5)*(MIN/700);
+    particles.push({x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0, max:0.55+Math.random()*0.35, color, size:(4+Math.random()*6)*(MIN/700)});
+  }
+  particles.push({ring:true, x, y, life:0, max:0.45, color, r0:r});
+}
+function spark(x,y,color,n,sc){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=(0.6+Math.random()*1.4)*(MIN/700);
+    particles.push({x:x+(Math.random()-0.5)*10, y:y+(Math.random()-0.5)*10, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0, max:0.35+Math.random()*0.3, color, size:(2+Math.random()*4)*(MIN/700)*(sc||1)});
+  }
+}
+function updateFx(dt, k){
+  for(const p of particles){
+    p.life += dt;
+    if(!p.ring){ p.x += p.vx*k; p.y += p.vy*k; p.vx *= Math.pow(0.93,k); p.vy *= Math.pow(0.93,k); }
+  }
+  particles = particles.filter(p=>p.life<p.max);
+  if(particles.length > 400) particles.splice(0, particles.length-400);
+  for(const f of floats){ f.t += dt; f.y -= 0.6*k*(MIN/700); }
+  floats = floats.filter(f=>f.t<f.max);
+}
+
+/* 光のにじみ（あらかじめ作っておく） */
+const glowCache = {};
+function glowSprite(color){
+  if(glowCache[color]) return glowCache[color];
+  const c = document.createElement('canvas'); c.width=c.height=128;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(64,64,0,64,64,64);
+  gr.addColorStop(0, color+'CC'); gr.addColorStop(0.45, color+'55'); gr.addColorStop(1, color+'00');
+  g.fillStyle = gr; g.fillRect(0,0,128,128);
+  return glowCache[color] = c;
+}
+
+/* ================= 描画 ================= */
+function shapePath(c, shape, x, y, r){
+  c.beginPath();
+  if(shape==='star'){
+    for(let i=0;i<10;i++){
+      const a = -Math.PI/2 + i*Math.PI/5, rr = (i%2===0) ? r*1.08 : r*0.5;
+      const px = x + Math.cos(a)*rr, py = y + Math.sin(a)*rr;
+      i ? c.lineTo(px,py) : c.moveTo(px,py);
+    }
+    c.closePath();
+  }else if(shape==='heart'){
+    const s = r*1.05;
+    c.moveTo(x, y + s*0.9);
+    c.bezierCurveTo(x - s*1.25, y + s*0.05, x - s*1.0, y - s*1.05, x, y - s*0.45);
+    c.bezierCurveTo(x + s*1.0, y - s*1.05, x + s*1.25, y + s*0.05, x, y + s*0.9);
+    c.closePath();
+  }else{
+    c.arc(x, y, r, 0, Math.PI*2);
+  }
+}
+
+function drawSkeleton(lm, color, alpha, lw){
+  ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap='round';
+  ctx.beginPath();
+  for(const [a,b] of BONES){
+    const p=lm[a], q=lm[b];
+    if(!p||!q||p.visibility<0.4||q.visibility<0.4) continue;
+    const A=toScr(p), B=toScr(q); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y);
+  }
+  ctx.stroke();
+  const n = lm[0];
+  if(n && n.visibility>0.4){ const N=toScr(n); ctx.beginPath(); ctx.arc(N.x, N.y, lw*2.2, 0, Math.PI*2); ctx.stroke(); }
+  ctx.restore();
+}
+
+function draw(now){
+  // カメラ映像
+  ctx.fillStyle = '#F3F6F9'; ctx.fillRect(0,0,W,H);
+  if(S.video!=='none' && video.readyState>=2){
+    ctx.save();
+    if(S.mirror){ ctx.translate(W,0); ctx.scale(-1,1); }
+    ctx.drawImage(video, L.ox, L.oy, L.dw, L.dh);
+    ctx.restore();
+    ctx.fillStyle = S.video==='soft' ? 'rgba(243,246,249,0.62)' : 'rgba(243,246,249,0.12)';
+    ctx.fillRect(0,0,W,H);
+  }
+
+  const lw = Math.max(4, MIN*0.008);
+  if(phase==='register'){
+    for(const lm of poses){
+      const isC = regCand && regCand.lm===lm;
+      drawSkeleton(lm, isC ? '#12906A' : '#5A6878', isC ? 0.95 : 0.55, lw);
+    }
+    // 両手を上げている人の頭のまわりに進み具合の輪
+    if(regCand && regCand.lm && regCand.lm[0]){
+      const N = toScr(regCand.lm[0]), rr = Math.max(40, MIN*0.08);
+      ctx.save(); ctx.lineWidth = lw*1.6; ctx.lineCap='round';
+      ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(N.x,N.y,rr,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle='#12906A'; ctx.beginPath(); ctx.arc(N.x,N.y,rr,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,regCand.t/REG_TIME)); ctx.stroke();
+      ctx.restore();
+    }
+  }else if(S.video==='none' && person && person.lm){
+    drawSkeleton(person.lm, '#8A96A3', 0.5, lw);
+  }
+
+  // 的
+  for(const t of targets) drawTarget(t, now);
+
+  // 粒
+  for(const p of particles){
+    const q = p.life/p.max;
+    if(p.ring){
+      ctx.save(); ctx.globalAlpha = 1-q; ctx.strokeStyle = p.color; ctx.lineWidth = lw*1.4;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r0*(1+q*0.9), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    }else{
+      ctx.globalAlpha = 1-q; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size*(1-q*0.5), 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // 手
+  if(phase!=='register' || person) for(const h of ['L','R']) drawHand(HANDS[h], now);
+
+  // 文字
+  for(const f of floats){
+    const q = f.t/f.max;
+    ctx.save(); ctx.globalAlpha = q<0.75 ? 1 : (1-q)/0.25;
+    ctx.font = '700 '+Math.round(f.size)+'px "BIZ UDPGothic", sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.lineWidth = Math.max(6, f.size*0.22); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
+    ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle=f.color; ctx.fillText(f.text, f.x, f.y);
+    ctx.restore();
+  }
+}
+
+function drawTarget(t, now){
+  const color = t.hand ? COL[t.hand] : COL.N;
+  let s = 1, a = 1;
+  if(t.state==='in'){ const q=Math.min(1,t.age/0.28); s = 1 + 2.4*Math.pow(q-1,3) + 1.4*Math.pow(q-1,2); }
+  if(t.state==='out'){ const q=Math.min(1,t.outT/0.35); s = 1 - q*0.4; a = 1-q; }
+  const pulse = 1 + Math.sin(now/260 + t.spin)*0.03;
+  const r = t.r * s * pulse;
+  const lw = Math.max(4, t.r*0.11);
+  ctx.save(); ctx.globalAlpha = a;
+  // 外がわの白いふち
+  shapePath(ctx, S.shape, t.x, t.y, r + lw*0.9);
+  ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.fill();
+  shapePath(ctx, S.shape, t.x, t.y, r);
+  ctx.fillStyle = color; ctx.fill();
+  // 内がわの輪
+  if(S.shape==='circle'){
+    ctx.beginPath(); ctx.arc(t.x, t.y, r*0.62, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=lw*0.8; ctx.stroke();
+  }
+  // 消えるまでの残り
+  if(isFinite(t.life) && t.state!=='out'){
+    const rem = Math.max(0, 1 - t.age/t.life);
+    ctx.beginPath(); ctx.arc(t.x, t.y, r + lw*2.4, -Math.PI/2, -Math.PI/2 + Math.PI*2*rem);
+    ctx.strokeStyle = color; ctx.lineWidth = lw*0.7; ctx.lineCap='round'; ctx.globalAlpha = a*0.75; ctx.stroke();
+    ctx.globalAlpha = a;
+  }
+  // みぎ・ひだり の文字
+  if(t.hand){
+    const fs = Math.round(t.r*(S.shape==='star'?0.36:0.44));
+    ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const ty = t.y + (S.shape==='heart' ? r*0.08 : 0);
+    ctx.lineWidth = Math.max(3, fs*0.18); ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineJoin='round';
+    ctx.strokeText(t.hand==='R'?'みぎ':'ひだり', t.x, ty);
+    ctx.fillStyle='#FFFFFF'; ctx.fillText(t.hand==='R'?'みぎ':'ひだり', t.x, ty);
+  }
+  ctx.restore();
+}
+
+function drawHand(hd, now){
+  if(hd.a <= 0.01) return;
+  const color = COL[hd.id], r = handR();
+  ctx.save();
+  // 軌跡
+  const tr = hd.trail;
+  if(tr.length > 2){
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    for(let i=1;i<tr.length;i++){
+      const q = i/tr.length;
+      ctx.globalAlpha = hd.a * q * 0.85;
+      ctx.strokeStyle = color; ctx.lineWidth = r*1.1*q;
+      ctx.beginPath(); ctx.moveTo(tr[i-1].x, tr[i-1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+    }
+    for(let i=1;i<tr.length;i++){
+      const q = i/tr.length;
+      ctx.globalAlpha = hd.a * q * 0.9;
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = r*0.35*q;
+      ctx.beginPath(); ctx.moveTo(tr[i-1].x, tr[i-1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+    }
+  }
+  // 光
+  ctx.globalAlpha = hd.a;
+  const g = glowSprite(color), gs = r*3.6 * (1 + Math.sin(now/180)*0.06);
+  ctx.drawImage(g, hd.x-gs, hd.y-gs, gs*2, gs*2);
+  // 輪
+  ctx.beginPath(); ctx.arc(hd.x, hd.y, r, 0, Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fill();
+  ctx.lineWidth = r*0.28; ctx.strokeStyle = color; ctx.stroke();
+  ctx.beginPath(); ctx.arc(hd.x, hd.y, r*0.32, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+  // ラベル（左右を使うときだけ）
+  if(S.hands!=='both' || S.lr){
+    const fs = Math.round(Math.max(18, r*0.62));
+    ctx.font='700 '+fs+'px "BIZ UDPGothic", sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.lineWidth = Math.max(4, fs*0.22); ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineJoin='round';
+    const lt = hd.id==='R' ? 'みぎ' : 'ひだり';
+    ctx.strokeText(lt, hd.x, hd.y + r*1.75); ctx.fillStyle = color; ctx.fillText(lt, hd.x, hd.y + r*1.75);
+  }
+  ctx.restore();
+}
+
+/* ================= はじめの表示 ================= */
+renderModes(); renderSummary();
+let helpSeen = false;
+try{ helpSeen = localStorage.getItem(HELP_KEY)==='1'; }catch(e){}
+if(!helpSeen) $('helpModal').hidden = false;
+
+})();
+</script>
+</body>
+</html>
