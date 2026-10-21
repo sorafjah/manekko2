@@ -268,8 +268,8 @@ const DEF = {
   colOne:'#1AA6C9', colR:'#E5487A', colL:'#1AA6C9', colP1:'#E5487A', colP2:'#1AA6C9', colVer:2,
   chasePath:'mix', chaseSpeed:'normal',
   slashKind:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3,
-  handsBy:{touch:'both', slash:'R', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
-  bothType:'free', defVer:4,
+  handsBy:{touch:'both', slash:'both', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
+  bothType:'free', bothWidth:'normal', defVer:5,
   orderKind:'num', orderNumStart:1, orderNumStep:1, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
   orderCount:5, orderDir:'up', orderHint:false, orderNext:'next',
   stopMove:'normal', stopLen:3, stopStrict:'normal', stopSpeed:'normal',
@@ -285,7 +285,8 @@ try{
     // 初期値を変えた設定を、新しい初期値にする
     if(!(s.defVer >= 3)){ s.bothType = 'free'; }
     if(!(s.defVer >= 4)){ s.orderHint = false; }
-    s.defVer = 4;
+    if(!(s.defVer >= 5)){ if(s.handsBy) s.handsBy.slash = 'both'; s.bothWidth = 'normal'; }
+    s.defVer = 5;
     if(s.sortSet==='fv') s.sortSet = 'color';
     S = Object.assign({}, DEF, s);
     S.handsBy = Object.assign({}, DEF.handsBy, s.handsBy || {});
@@ -362,6 +363,9 @@ const SCHEMA = [
   {grp:'りょうての せってい', mode:['both']},
   {key:'bothType', label:R_('出','で')+'かた', type:'seg', opts:[['free','ばらばら'],['sym','そろえて']],
     hint:'ばらばら：'+R_('高','たか')+'さが ちがったり、たてに ならんだりするよ。そろえて：'+R_('左','ひだり')+'と '+R_('右','みぎ')+'に '+R_('同','おな')+'じ たかさで '+R_('出','で')+'るよ。'+R_('両手','りょうて')+'で '+R_('同時','どうじ')+'に さわると「そろった」に なるよ。'+R_('左右','さゆう')+'の'+R_('指定','してい')+'が あるときは、'+R_('右手','みぎて')+'で '+R_('左','ひだり')+'の '+R_('的','まと')+'を さわることも あるよ。'},
+
+  {key:'bothWidth', label:R_('両手','りょうて')+'の はば', type:'seg', opts:[['wide','ひろい'],['normal','ふつう'],['narrow','せまい']],
+    hint:'ひろい：'+R_('画面','がめん')+'の はしから はしまで。ふつう：'+R_('画面','がめん')+'の '+R_('半分','はんぶん')+'まで。せまい：'+R_('画面','がめん')+'の 3ぶんの1まで。ふたりの ときは、じぶんの ばしょの なかで かわるよ。'},
 
   {grp:'じゅんばんの せってい', mode:['order']},
   {key:'orderKind', label:'しゅるい', type:'seg', opts:[['num',R_('数字','すうじ')],['hira','ひらがな'],['ABC','ABC（'+R_('大文字','おおもじ')+'）'],['abc','abc（'+R_('小文字','こもじ')+'）']]},
@@ -827,7 +831,7 @@ async function startStage(){
 function newGame(){
   remain = S.time;
   for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; pl.rounds=0; pl.ordRound=0; pl.points=0; pl.trIdx=null; pl.stopOK=0; pl.stopN=0; pl.stop=null; pl.ord=null; pl.sort=null; pl.tr=null; }
-  targets = []; particles = []; floats = []; chasers = []; items = []; pieces = []; pairs = []; stopSt = null;
+  targets = []; particles = []; floats = []; chasers = []; items = []; pieces = []; slashFx = []; pairs = []; stopSt = null;
   gameStarted = false;
   hudScore.hidden = true; hudTime.hidden = true; hudScore2.hidden = true; hudGrow2.hidden = true;
   updateHud();
@@ -1413,9 +1417,43 @@ const KINDS = {
   mix:['balloon','apple','mikan','suika','momo','tomato','nasu','ninjin','piman']
 };
 const BALLOON_COL = ['#E03A3A','#F07A18','#E8B10C','#1FA85A','#1AA6C9','#2C6BDF','#7C4DDB','#E5487A'];
-const ITEM_NAME = {balloon:'パン！', apple:'スパッ！', mikan:'スパッ！', suika:'スパッ！', momo:'スパッ！', tomato:'スパッ！', nasu:'スパッ！', ninjin:'スパッ！', piman:'スパッ！'};
 const ITEM_JUICE = {apple:'#F4D9A8', mikan:'#F7A21B', suika:'#E8384F', momo:'#F7C6B0', tomato:'#E0352B', nasu:'#EDE6C8', ninjin:'#F07A18', piman:'#EAF5D0'};
-let items = [], pieces = [];
+let items = [], pieces = [], slashFx = [];
+// きったときの 「シュッ」という 音（ノイズを すばやく 高い→低いに）
+function swoosh(){
+  if(!S.sound || !actx) return;
+  try{
+    const t = actx.currentTime, len = 0.22, n = Math.floor(actx.sampleRate*len);
+    const buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const bp = actx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(5200, t); bp.frequency.exponentialRampToValueAtTime(900, t+len);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t+0.025); g.gain.exponentialRampToValueAtTime(0.0001, t+len);
+    src.connect(bp); bp.connect(g); g.connect(actx.destination); src.start(t); src.stop(t+len+0.02);
+  }catch(e){}
+}
+// きった あとの ひかる すじ と わ
+function addSlashFx(x, y, ang, r, color){
+  slashFx.push({x, y, ang, r, color, t:0, max:0.38});
+}
+function drawSlashFx(){
+  for(const f of slashFx){
+    const q = Math.min(1, f.t/f.max), a = 1 - q;
+    ctx.save(); ctx.translate(f.x, f.y);
+    // わ
+    ctx.beginPath(); ctx.arc(0, 0, f.r*(0.9 + q*0.9), 0, Math.PI*2);
+    ctx.lineWidth = Math.max(3, f.r*0.12*(1-q)); ctx.strokeStyle = f.color; ctx.globalAlpha = a*0.8; ctx.stroke();
+    // すじ
+    ctx.rotate(f.ang);
+    const L = f.r*(1.6 + q*1.4), w = Math.max(4, f.r*0.16)*(1 - q*0.7);
+    ctx.globalAlpha = a; ctx.shadowColor = f.color; ctx.shadowBlur = f.r*0.5;
+    ctx.beginPath(); ctx.moveTo(-L, 0); ctx.quadraticCurveTo(0, -w, L, 0); ctx.quadraticCurveTo(0, w, -L, 0);
+    ctx.fillStyle = '#FFFFFF'; ctx.fill();
+    ctx.restore();
+  }
+}
 let hintCd = 0;
 const cutSpeed = ()=> MIN*SLASH_CUT[S.slashEase];
 
@@ -1478,6 +1516,8 @@ function updateSlash(dt, now){
   items = items.filter(it=> !it.dead && it.y < H + it.r*2.5 && it.y > -it.r*3);
   for(const p of pieces){ p.vy += p.g*dt; p.vx *= Math.pow(0.4, dt); p.x += p.vx*dt; p.y += p.vy*dt; p.rot += p.spin*dt; p.t += dt; }
   pieces = pieces.filter(p=> p.t < 2);
+  for(const f of slashFx) f.t += dt;
+  slashFx = slashFx.filter(f=> f.t < f.max);
 }
 function cutItem(it, hd, h){
   it.dead = true;
@@ -1489,6 +1529,7 @@ function cutItem(it, hd, h){
     for(let i=0;i<10;i++){ const a=Math.random()*6.28, s=(3+Math.random()*4)*(MIN/700);
       particles.push({x:it.x, y:it.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:0, max:0.5+Math.random()*0.3, color:it.color, size:(6+Math.random()*6)*(MIN/700)}); }
     tone(1200,.06,'square',.12); tone(300,.12,'triangle',.18,.02);
+    addSlashFx(it.x, it.y, ang, it.r, '#FFFFFF');
   }else{
     for(const sgn of [1,-1]){
       pieces.push({ kind:it.kind, r:it.r, x:it.x + nx*sgn*it.r*0.08, y:it.y + ny*sgn*it.r*0.08,
@@ -1498,9 +1539,9 @@ function cutItem(it, hd, h){
     const jc = ITEM_JUICE[it.kind] || '#FFFFFF';
     for(let i=0;i<16;i++){ const a=Math.random()*6.28, s=(2+Math.random()*5)*(MIN/700);
       particles.push({x:it.x, y:it.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:0, max:0.45+Math.random()*0.35, color:jc, size:(3+Math.random()*5)*(MIN/700)}); }
-    SFX.hit();
+    swoosh(); tone(1500,.08,'triangle',.1,.03);
+    addSlashFx(it.x, it.y, ang, it.r, ITEM_JUICE[it.kind] || '#FFFFFF');
   }
-  floats.push({x:it.x, y:it.y - it.r*0.3, text:ITEM_NAME[it.kind], color:'#1E2833', t:0, max:0.8, size:Math.max(30, it.r*0.6)});
 }
 
 // 食べもの・ふうせんの絵（中心0,0・半径r）
@@ -1660,22 +1701,31 @@ function spawnPair(pl){
   cx = Math.max(xa + (xb-xa)*0.3, Math.min(xb - (xb-xa)*0.3, cx));
   const gap = Math.max(r*1.4, (pl.sw||MIN*0.2)*0.55);
   const maxL = Math.max(1, cx - gap - xa), maxR = Math.max(1, xb - (cx + gap));
+  // 両手の はば（ふたつの 的の よこの きょり）
+  const zw = xb - xa, maxSpan = zw * ({wide:1, normal:0.5, narrow:1/3}[S.bothWidth] || 0.5);
+  const minSpan = Math.min(maxSpan, Math.max(r*2.4, Math.min(gap*2, maxSpan*0.55)));
+  const pairX = ()=>{
+    const d = minSpan + Math.random()*(maxSpan - minSpan);
+    let c = cx + (Math.random()-0.5)*(zw - d)*0.6;
+    c = Math.max(xa + d/2, Math.min(xb - d/2, c));
+    return [c - d/2, c + d/2];
+  };
   let A, B;
   // ばらばらのときは、ときどき たてに ならべる
   const tate = S.bothType==='free' && Math.random() < 0.3;
   for(let k=0;k<30;k++){
     if(S.bothType==='sym'){
-      const dx = gap + Math.min(maxL, maxR)*(0.35 + 0.65*Math.random());
-      const y = y0 + Math.random()*(y1-y0);
-      A = {x:cx-dx, y}; B = {x:cx+dx, y};
+      const [ax, bx] = pairX(), y = y0 + Math.random()*(y1-y0);
+      A = {x:ax, y}; B = {x:bx, y};
     }else if(tate){
-      const x = xa + Math.random()*(xb-xa), hh = y1-y0;
-      A = {x: x + (Math.random()-0.5)*r*1.5, y: y0 + Math.random()*hh*0.25};
-      B = {x: x + (Math.random()-0.5)*r*1.5, y: y1 - Math.random()*hh*0.25};
+      const x = xa + Math.random()*(xb-xa), hh = y1-y0, jw = Math.min(r*1.5, maxSpan);
+      A = {x: Math.max(xa, Math.min(xb, x + (Math.random()-0.5)*jw)), y: y0 + Math.random()*hh*0.25};
+      B = {x: Math.max(xa, Math.min(xb, x + (Math.random()-0.5)*jw)), y: y1 - Math.random()*hh*0.25};
       if(Math.random()<0.5){ const t=A; A=B; B=t; }
     }else{
-      A = {x: cx - gap - Math.random()*maxL, y: y0 + Math.random()*(y1-y0)};
-      B = {x: cx + gap + Math.random()*maxR, y: y0 + Math.random()*(y1-y0)};
+      const [ax, bx] = pairX();
+      A = {x: ax, y: y0 + Math.random()*(y1-y0)};
+      B = {x: bx, y: y0 + Math.random()*(y1-y0)};
     }
     let ok = true;
     for(const h of ['R','L']){ const hd=pl.hands[h]; if(hd.seen && (Math.hypot(hd.x-A.x,hd.y-A.y)<r*2.2 || Math.hypot(hd.x-B.x,hd.y-B.y)<r*2.2)) ok=false; }
@@ -2367,7 +2417,7 @@ function draw(now){
 
   // 的
   if(phase==='play' || phase==='countdown' || gameStarted){
-    const fn = {slash:drawSlash, chase:drawChase, both:drawBoth, order:drawOrder, stop:drawStop, sort:drawSort, trace:drawTrace}[S.mode];
+    const fn = {slash:(n)=>{ drawSlash(n); drawSlashFx(); }, chase:drawChase, both:drawBoth, order:drawOrder, stop:drawStop, sort:drawSort, trace:drawTrace}[S.mode];
     if(fn) fn(now); else for(const t of targets) drawTarget(t, now);
   }
 
