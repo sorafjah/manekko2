@@ -270,7 +270,7 @@ const DEF = {
   slashKind:'mix', slashPath:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3,
   handsBy:{touch:'both', slash:'both', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
   bothType:'free', bothWidth:'normal', defVer:5,
-  orderKind:'num', orderNumStart:1, orderNumStep:1, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
+  orderKind:'num', orderNumStart:1, orderNumStep:1, orderNumGap:3, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
   orderCount:5, orderDir:'up', orderHint:false, orderNext:'next',
   stopMove:'normal', stopLen:3, stopStrict:'normal', stopSpeed:'normal',
   sortSet:'color', sortN:2, sortBox:'bottom',
@@ -372,7 +372,10 @@ const SCHEMA = [
   {grp:'じゅんばんの せってい', mode:['order']},
   {key:'orderKind', label:'しゅるい', type:'seg', opts:[['num',R_('数字','すうじ')],['hira','ひらがな'],['ABC','ABC（'+R_('大文字','おおもじ')+'）'],['abc','abc（'+R_('小文字','こもじ')+'）']]},
   {key:'orderNumStart', label:'はじめ', type:'step', min:0, max:100, step:1, unit:'から', show:()=>S.orderKind==='num'},
-  {key:'orderNumStep', label:'とびかた', type:'seg', opts:[[1,'1ずつ'],[2,'2とび'],[5,'5とび'],[10,'10とび']], show:()=>S.orderKind==='num'},
+  {key:'orderNumStep', label:'とびかた', type:'seg', opts:[[1,'1ずつ'],[2,'2とび'],[5,'5とび'],[10,'10とび'],['rand','ランダム']], show:()=>S.orderKind==='num',
+    hint:'ランダム：'+R_('数字','すうじ')+'が ばらばらに とぶよ。たとえば 3→4→7→12→14。じゅんばんは '+R_('小','ちい')+'さい '+R_('方','ほう')+'から（むきで かえられるよ）。'},
+  {key:'orderNumGap', label:'とぶ はば', type:'step', min:2, max:10, step:1, unit:'まで', show:()=>S.orderKind==='num' && S.orderNumStep==='rand',
+    hint:'となりの '+R_('数字','すうじ')+'との ちがいが、1から この '+R_('数','かず')+'までの ランダムに なるよ。'},
   {key:'orderHiraStart', label:'はじめ', type:'pick', list:()=>HIRA, unit:'から', show:()=>S.orderKind==='hira'},
   {key:'orderHiraStep', label:'とびかた', type:'seg', opts:[['one','1もじずつ'],['row',R_('行','ぎょう')+'の はじめ（あ・か・さ…）']], show:()=>S.orderKind==='hira'},
   {key:'orderAbcStart', label:'はじめ', type:'pick', list:()=>S.orderKind==='ABC' ? ABC : abc, unit:'から', show:()=>S.orderKind==='ABC' || S.orderKind==='abc'},
@@ -832,7 +835,7 @@ async function startStage(){
 
 function newGame(){
   remain = S.time;
-  for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; pl.rounds=0; pl.ordRound=0; pl.points=0; pl.trIdx=null; pl.stopOK=0; pl.stopN=0; pl.stop=null; pl.ord=null; pl.sort=null; pl.tr=null; }
+  for(const pl of players){ pl.score=0; pl.byHand={R:0,L:0}; pl.spawnT=0; pl.lastAssign=[]; pl.rounds=0; pl.ordRound=0; pl.ordLast=null; pl.ordLastNext=null; pl.points=0; pl.trIdx=null; pl.stopOK=0; pl.stopN=0; pl.stop=null; pl.ord=null; pl.sort=null; pl.tr=null; }
   targets = []; particles = []; floats = []; chasers = []; items = []; pieces = []; slashFx = []; pairs = []; stopSt = null;
   gameStarted = false;
   hudScore.hidden = true; hudTime.hidden = true; hudScore2.hidden = true; hudGrow2.hidden = true;
@@ -1821,8 +1824,19 @@ const HEADS = 'あかさたなはまやらわ'.split('');
 const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const abc = ABC.map(c=>c.toLowerCase());
 // round：なん回めか（つづきへ すすむ ときに つかう）
-function orderSeq(round){
+function orderSeq(round, pl){
   const n = S.orderCount, d = S.orderDir==='down' ? -1 : 1, out = [], sh = (round||0)*n;
+  if(S.orderKind==='num' && S.orderNumStep==='rand'){
+    // ばらばらに とぶ：1〜orderNumGap の ランダムな ちがいで すすむ
+    let v = (round>0 && pl && pl.ordLast!=null) ? pl.ordLast + d*(1 + Math.floor(Math.random()*S.orderNumGap)) : S.orderNumStart;
+    for(let i=0;i<n;i++){
+      if(v<0 || v>999) break;
+      out.push(String(v));
+      v += d*(1 + Math.floor(Math.random()*S.orderNumGap));
+    }
+    if(pl && out.length) pl.ordLastNext = Number(out[out.length-1]);
+    return out;
+  }
   if(S.orderKind==='num'){
     for(let i=0;i<n;i++){ const v = S.orderNumStart + d*(sh+i)*S.orderNumStep; if(v<0 || v>999) break; out.push(String(v)); }
   }else if(S.orderKind==='hira'){
@@ -1840,8 +1854,9 @@ function orderSeq(round){
 }
 function orderRound(pl){
   let rd = S.orderNext==='next' ? (pl.ordRound||0) : 0;
-  let seq = orderSeq(rd);
-  if(seq.length < 1 && rd > 0){ rd = 0; seq = orderSeq(0); }   // さいごまで いったら はじめに もどる
+  let seq = orderSeq(rd, pl);
+  if(seq.length < 1 && rd > 0){ rd = 0; seq = orderSeq(0, pl); }
+  if(pl.ordLastNext!=null){ pl.ordLast = pl.ordLastNext; pl.ordLastNext = null; }   // さいごまで いったら はじめに もどる
   pl.ordRound = rd;
   const z = zoneOf(pl);
   let r = MIN*SIZE_R[S.size], toks = [];
