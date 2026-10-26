@@ -269,7 +269,7 @@ const DEF = {
   chasePath:'mix', chaseSpeed:'normal',
   slashKind:'mix', slashPath:'mix', slashSpeed:'normal', slashEase:'normal', slashCount:3,
   handsBy:{touch:'both', slash:'both', chase:'both', both:'both', order:'both', stop:'both', sort:'both', trace:'both'},
-  bothType:'free', bothWidth:'normal', defVer:5,
+  bothType:'free', defVer:5,
   orderKind:'num', orderNumStart:1, orderNumStep:1, orderNumGap:3, orderHiraStart:0, orderHiraStep:'one', orderAbcStart:0, orderAbcStep:1,
   orderCount:5, orderDir:'up', orderHint:false, orderNext:'next',
   stopMove:'normal', stopLen:3, stopStrict:'normal', stopSpeed:'normal',
@@ -285,7 +285,7 @@ try{
     // 初期値を変えた設定を、新しい初期値にする
     if(!(s.defVer >= 3)){ s.bothType = 'free'; }
     if(!(s.defVer >= 4)){ s.orderHint = false; }
-    if(!(s.defVer >= 5)){ if(s.handsBy) s.handsBy.slash = 'both'; s.bothWidth = 'normal'; }
+    if(!(s.defVer >= 5)){ if(s.handsBy) s.handsBy.slash = 'both'; }
     s.defVer = 5;
     if(s.sortSet==='fv') s.sortSet = 'color';
     S = Object.assign({}, DEF, s);
@@ -365,9 +365,6 @@ const SCHEMA = [
   {grp:'りょうての せってい', mode:['both']},
   {key:'bothType', label:R_('出','で')+'かた', type:'seg', opts:[['free','ばらばら'],['sym','そろえて']],
     hint:'ばらばら：'+R_('高','たか')+'さが ちがったり、たてに ならんだりするよ。そろえて：'+R_('左','ひだり')+'と '+R_('右','みぎ')+'に '+R_('同','おな')+'じ たかさで '+R_('出','で')+'るよ。'+R_('両手','りょうて')+'で '+R_('同時','どうじ')+'に さわると「そろった」に なるよ。'+R_('左右','さゆう')+'の'+R_('指定','してい')+'が あるときは、'+R_('右手','みぎて')+'で '+R_('左','ひだり')+'の '+R_('的','まと')+'を さわることも あるよ。'},
-
-  {key:'bothWidth', label:R_('両手','りょうて')+'の はば', type:'seg', opts:[['wide','ひろい'],['normal','ふつう'],['narrow','せまい']],
-    hint:'ふたつの '+R_('的','まと')+'の きょりだよ。'+R_('画面','がめん')+'の たてと よこの ながい ほうを もとに するよ。ひろい：ぜんぶ。ふつう：'+R_('半分','はんぶん')+'まで。せまい：3ぶんの1まで。'+R_('右手','みぎて')+'で '+R_('左','ひだり')+'の '+R_('的','まと')+'を さわる ときは、もっと ちかくに '+R_('出','で')+'るよ。'},
 
   {grp:'じゅんばんの せってい', mode:['order']},
   {key:'orderKind', label:'しゅるい', type:'seg', opts:[['num',R_('数字','すうじ')],['hira','ひらがな'],['ABC','ABC（'+R_('大文字','おおもじ')+'）'],['abc','abc（'+R_('小文字','こもじ')+'）']]},
@@ -1724,14 +1721,15 @@ function spawnPair(pl){
   const zw = xb - xa, zh = y1 - y0;
   let cx = two() ? (z.xa+z.xb)/2 : (pl.active ? pl.cx : W/2);
   cx = Math.max(xa + zw*0.3, Math.min(xb - zw*0.3, cx));
-  // 両手の はば：たて・よこの ながい ほうを もとに、ふたつの 的の きょりを きめる
-  const longer = Math.max(zw, zh) + 2*m;
-  const maxDist = Math.max(r*2.6, longer * ({wide:1, normal:0.5, narrow:1/3}[S.bothWidth] || 0.5));
+  // ふたつの 的の きょりは、その人の かたはばを もとに、両手が とどく はんいに する
+  // （両うでを ひろげた はばは かたはばの 約3ばい。よゆうを みて 2.4ばいまで）
+  const sw = Math.max(MIN*0.12, Math.min(MIN*0.5, pl.sw || MIN*0.2));
   const minD = r*2.4;
+  const maxDist = Math.max(minD*1.1, Math.min(Math.hypot(zw, zh), sw*2.4));
   const tate = S.bothType==='free' && Math.random() < 0.3;
   // 右手が 左、左手が 右に なる（うでを クロスする）ときは、もっと ちかくに する
   const cross = designated() && !tate && Math.random() < 0.2;
-  const cap = cross ? Math.max(minD*1.05, Math.min(maxDist*0.6, MIN*0.42)) : maxDist;
+  const cap = cross ? Math.max(minD*1.05, Math.min(maxDist, sw*1.1)) : maxDist;
   const rnd = (a,b)=> a + Math.random()*Math.max(0, b-a);
   const clampX = x=> Math.max(xa, Math.min(xb, x)), clampY = y=> Math.max(y0, Math.min(y1, y));
   let A, B;
