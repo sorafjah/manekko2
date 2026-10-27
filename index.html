@@ -601,9 +601,22 @@ function tone(f, dur, type, vol, when){
     o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+0.03);
   }catch(e){}
 }
+function glide(f1, f2, dur, vol, when){
+  if(!S.sound || !actx) return;
+  try{
+    const t = actx.currentTime + (when||0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t+dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol||0.12, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+0.03);
+  }catch(e){}
+}
 const SFX = {
   hit(){ tone(880,.12,'triangle',.22); tone(1320,.2,'triangle',.18,.06); },
-  wrong(){ tone(392,.16,'sine',.09); },
+  // まちがえたとき：やさしい「ぽよん」（小さめの音）
+  wrong(){ glide(420, 260, .22, .12); glide(300, 200, .2, .08, .16); },
+  // ぜんぶ できたとき：ファンファーレ と キラキラ
+  clear(){ [523,659,784,1047].forEach((f,i)=>tone(f,.22,'triangle',.2,i*.1)); tone(1319,.35,'triangle',.16,.42); [2093,2637,3136].forEach((f,i)=>tone(f,.18,'sine',.06,.5+i*.07)); },
   tick(){ tone(660,.14,'sine',.18); },
   go(){ tone(988,.3,'triangle',.22); },
   reg(){ tone(523,.12,'triangle',.18); tone(659,.12,'triangle',.18,.1); tone(784,.22,'triangle',.18,.2); },
@@ -1223,7 +1236,7 @@ function updateTouch(dt, now, cnt){
         t.wrongCd = 1.4;
         const need = t.hand==='R' ? 'みぎて' : 'ひだりて';
         floats.push({x:t.x, y:t.y - t.r - 24, text:need+'で さわってね', color:t.color, t:0, max:1.4, size:Math.max(24, MIN*0.04)});
-        SFX.wrong();
+        missFx(t.x, t.y, t.r); SFX.wrong();
       }
     }
   }
@@ -1527,7 +1540,7 @@ function updateSlash(dt, now){
         continue;
       }
       if(it.hand && it.hand!==h){
-        if(hintCd<=0){ hintCd = 1.6; floats.push({x:it.x, y:it.y - it.r - 26, text:(it.hand==='R'?'みぎて':'ひだりて')+'で きってね', color:handColor(pl,it.hand), t:0, max:1.3, size:Math.max(24, MIN*0.038)}); SFX.wrong(); }
+        if(hintCd<=0){ hintCd = 1.6; floats.push({x:it.x, y:it.y - it.r - 26, text:(it.hand==='R'?'みぎて':'ひだりて')+'で きってね', color:handColor(pl,it.hand), t:0, max:1.3, size:Math.max(24, MIN*0.038)}); missFx(it.x, it.y, it.r); SFX.wrong(); }
         continue;
       }
       cutItem(it, hd, h);
@@ -1783,7 +1796,7 @@ function updateBoth(dt, now){
       const h = touchingHand(pl, t.x, t.y, t.r);
       if(!h) continue;
       if(t.hand && t.hand!==h){
-        if(p.wrongCd<=0){ p.wrongCd=1.4; addFloat(t.x, t.y - t.r - 26, (t.hand==='R'?'みぎて':'ひだりて')+'で さわってね', t.color); SFX.wrong(); }
+        if(p.wrongCd<=0){ p.wrongCd=1.4; addFloat(t.x, t.y - t.r - 26, (t.hand==='R'?'みぎて':'ひだりて')+'で さわってね', t.color); missFx(t.x, t.y, t.r); SFX.wrong(); }
         continue;
       }
       if(now - t.lastT > 450) tone(740,.08,'triangle',.15);
@@ -1793,6 +1806,7 @@ function updateBoth(dt, now){
     if(aOn && bOn && p.a.by !== p.b.by){
       p.state='out'; p.outT=0; pl.score++;
       burst(p.a.x, p.a.y, p.a.color, p.a.r); burst(p.b.x, p.b.y, p.b.color, p.b.r);
+      starBurst(p.a.x, p.a.y, p.a.color, p.a.r); starBurst(p.b.x, p.b.y, p.b.color, p.b.r);
       addFloat((p.a.x+p.b.x)/2, (p.a.y+p.b.y)/2, 'そろった！', '#1E2833', Math.max(32, p.a.r*0.6), 0.9);
       SFX.hit(); pl.spawnT = 0.45;
     }else if((aOn || bOn) && p.hintCd<=0){
@@ -1881,25 +1895,25 @@ function updateOrder(dt, now){
     const o = pl.ord; o.hintCd = Math.max(0, o.hintCd-dt);
     if(o.wait > 0){ o.wait -= dt; if(o.wait <= 0) orderRound(pl); continue; }
     for(const t of o.toks){
-      t.age += dt; t.wrongCd = Math.max(0, t.wrongCd-dt);
+      t.age += dt; t.wrongCd = Math.max(0, t.wrongCd-dt); if(t.shake) t.shake = Math.max(0, t.shake-dt);
       if(t.done){ t.doneT += dt; continue; }
       if(t.age < 0.3) continue;
       const h = touchingHand(pl, t.x, t.y, t.r);
       if(!h) continue;
       if(t.i === o.next){
         t.done = true; o.next++; pl.score++; pl.byHand[h]++;
-        burst(t.x, t.y, handColor(pl,h), t.r);
+        burst(t.x, t.y, handColor(pl,h), t.r); starBurst(t.x, t.y, handColor(pl,h), t.r);
         tone(523*Math.pow(2, Math.min(t.i,12)/12), .18, 'triangle', .22);
         if(o.next >= o.toks.length){
           pl.rounds = (pl.rounds||0) + 1; o.wait = 1.6; pl.ordRound = (pl.ordRound||0) + 1;
           const z = zoneOf(pl);
           addFloat((z.xa+z.xb)/2, H*0.5, 'ぜんぶ できた！', handColor(pl,'R'), Math.max(44, MIN*0.08), 1.5);
-          SFX.end();
+          confetti(z.xa, z.xb, two() ? 40 : 70); SFX.clear();
         }
       }else if(t.wrongCd<=0 && o.hintCd<=0){
         t.wrongCd = 1.5; o.hintCd = 1.0;
         addFloat(t.x, t.y - t.r - 26, 'つぎは '+o.toks[o.next].label+' だよ', '#1E2833');
-        SFX.wrong();
+        missFx(t.x, t.y, t.r); t.shake = 0.45; SFX.wrong();
       }
     }
   }
@@ -1924,7 +1938,8 @@ function drawOrder(now){
           ctx.save(); ctx.strokeStyle='#FFFFFF'; ctx.globalAlpha=0.9; ctx.lineWidth=Math.max(5, t.r*0.12);
           ctx.beginPath(); ctx.arc(t.x, t.y, t.r*(1.3 + 0.12*Math.sin(now/180)), 0, Math.PI*2); ctx.stroke(); ctx.restore();
         }
-        drawBall(t.x, t.y, t.r*s, color, t.label, {shape:'circle', lit:isNext, fill:darkHex(color, 0.7)});
+        const sx = t.shake ? Math.sin(t.shake*60)*t.r*0.12*(t.shake/0.45) : 0;
+        drawBall(t.x + sx, t.y, t.r*s, color, t.label, {shape:'circle', lit:isNext, fill:darkHex(color, 0.7)});
       }
     }
     if(S.orderHint && o.next < o.toks.length){
@@ -1987,6 +2002,7 @@ function updateStop(dt, now){
         pl.score++; pl.stopOK = (pl.stopOK||0) + 1;
         for(const h in s.anch){ const a = s.anch[h]; burst(a.x, a.y, handColor(pl,h), handR()*1.6); }
         const z = zoneOf(pl); addFloat((z.xa+z.xb)/2, H*0.45, 'ぴたっ！ できた', handColor(pl,'R'), Math.max(44, MIN*0.08), 1.4);
+        confetti(z.xa, z.xb, two() ? 30 : 50);
       }
       pl.stop = null;
     }
@@ -2104,11 +2120,12 @@ function updateSort(dt, now){
           if(k === it.cat){
             it.state='in'; it.t=0; it.box=boxes[k]; pl.score++; pl.byHand[it.hand]++;
             burst(boxes[k].x+boxes[k].w/2, boxes[k].y+boxes[k].h/2, handColor(pl, it.hand), Math.min(boxes[k].w, boxes[k].h)*0.4);
+            starBurst(boxes[k].x+boxes[k].w/2, boxes[k].y+boxes[k].h/2, handColor(pl, it.hand), it.r);
             addFloat(boxes[k].x+boxes[k].w/2, boxes[k].y - 24, 'せいかい！', '#1E2833', Math.max(32, MIN*0.05), 1.0);
             SFX.hit();
           }else{
             it.state='back';
-            addFloat(it.x, it.y - it.r - 26, 'ちがう はこだよ', '#1E2833'); SFX.wrong();
+            addFloat(it.x, it.y - it.r - 26, 'ちがう はこだよ', '#1E2833'); missFx(it.x, it.y, it.r); SFX.wrong();
           }
           break;
         }
@@ -2275,7 +2292,7 @@ function updateTrace(dt, now){
         T.done = true; T.doneT = 0; pl.score++; pl.byHand[T.lastHand]++;
         T.strokes.forEach(s=>{ for(let i=0;i<s.length;i+=Math.max(1, Math.floor(s.length/8))) burst(s[i][0], s[i][1], handColor(pl, T.lastHand), tol*0.6); });
         const z = zoneOf(pl); addFloat((z.xa+z.xb)/2, H*0.5, 'できた！', handColor(pl,'R'), Math.max(48, MIN*0.09), 1.4);
-        SFX.end();
+        confetti(z.xa, z.xb, two() ? 40 : 70); SFX.clear();
       }else{
         tone(880,.12,'triangle',.2);
       }
@@ -2351,6 +2368,27 @@ function burst(x,y,color,r){
   }
   particles.push({ring:true, x, y, life:0, max:0.45, color, r0:r});
 }
+// うまくいったとき：ほしが とびちる
+function starBurst(x, y, color, r){
+  const n = 9;
+  for(let i=0;i<n;i++){
+    const a = Math.PI*2*i/n + Math.random()*0.4, sp = (3+Math.random()*3.5)*(MIN/700);
+    particles.push({star:true, x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0, max:0.7+Math.random()*0.3,
+      color: Math.random()<0.5 ? '#FFD23F' : color, size:(13+Math.random()*9)*(MIN/700), rot:Math.random()*6.28, spin:(Math.random()-0.5)*8});
+  }
+}
+// ぜんぶ できたとき：かみふぶき
+function confetti(xa, xb, n){
+  const cols = ['#E03A3A','#F07A18','#FFD23F','#1FA85A','#1AA6C9','#2C6BDF','#7C4DDB','#E5487A'];
+  for(let i=0;i<(n||60);i++){
+    particles.push({conf:true, x: xa + Math.random()*(xb-xa), y: HUDH - Math.random()*H*0.25, vx:(Math.random()-0.5)*2*(MIN/700), vy:(1+Math.random()*2.5)*(MIN/700),
+      life:0, max:1.6+Math.random()*0.8, color:cols[i%cols.length], size:(7+Math.random()*6)*(MIN/700), rot:Math.random()*6.28, spin:(Math.random()-0.5)*10});
+  }
+}
+// まちがえたとき：はいいろの わが ふるえて きえる（せめない ひかえめな 合図）
+function missFx(x, y, r){
+  particles.push({miss:true, x, y, life:0, max:0.6, color:'#8A96A3', r0:r});
+}
 function spark(x,y,color,n,sc){
   for(let i=0;i<n;i++){
     const a=Math.random()*Math.PI*2, sp=(0.6+Math.random()*1.4)*(MIN/700);
@@ -2360,10 +2398,12 @@ function spark(x,y,color,n,sc){
 function updateFx(dt, k){
   for(const p of particles){
     p.life += dt;
-    if(!p.ring){ p.x += p.vx*k; p.y += p.vy*k; p.vx *= Math.pow(0.93,k); p.vy *= Math.pow(0.93,k); }
+    if(p.conf){ p.x += (p.vx + Math.sin(p.life*4 + p.rot)*0.8*(MIN/700))*k; p.y += p.vy*k; p.rot += p.spin*dt; continue; }
+    if(p.star) p.rot += p.spin*dt;
+    if(!p.ring && !p.miss){ p.x += p.vx*k; p.y += p.vy*k; p.vx *= Math.pow(0.93,k); p.vy *= Math.pow(0.93,k); }
   }
   particles = particles.filter(p=>p.life<p.max);
-  if(particles.length > 400) particles.splice(0, particles.length-400);
+  if(particles.length > 500) particles.splice(0, particles.length-500);
   for(const f of floats){ f.t += dt; f.y -= 0.6*k*(MIN/700); }
   floats = floats.filter(f=>f.t<f.max);
 }
@@ -2467,6 +2507,17 @@ function draw(now){
     if(p.ring){
       ctx.save(); ctx.globalAlpha = 1-q; ctx.strokeStyle = p.color; ctx.lineWidth = lw*1.4;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r0*(1+q*0.9), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    }else if(p.miss){
+      ctx.save(); ctx.globalAlpha = 0.85*(1-q); ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(4, p.r0*0.1);
+      ctx.setLineDash([p.r0*0.25, p.r0*0.18]);
+      const sx = Math.sin(p.life*55)*p.r0*0.08*(1-q);
+      ctx.beginPath(); ctx.arc(p.x + sx, p.y, p.r0*(1.25 - q*0.2), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    }else if(p.star || p.conf){
+      ctx.save(); ctx.globalAlpha = p.conf ? Math.min(1, (1-q)*3) : 1-q; ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      if(p.star){ shapePath(ctx, 'star', 0, 0, p.size*(1-q*0.3)); ctx.fill(); }
+      else{ ctx.scale(1, Math.abs(Math.cos(p.life*6 + p.rot))*0.8 + 0.2); ctx.fillRect(-p.size*0.5, -p.size*0.35, p.size, p.size*0.7); }
+      ctx.restore();
     }else{
       ctx.globalAlpha = 1-q; ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size*(1-q*0.5), 0, Math.PI*2); ctx.fill();
